@@ -19,6 +19,7 @@ export type Database = {
           class_id: string | null
           date: string
           id: string
+          period: string
           recorded_by: string | null
           status: Database["public"]["Enums"]["attendance_status"]
           student_id: string
@@ -28,6 +29,7 @@ export type Database = {
           class_id?: string | null
           date: string
           id?: string
+          period?: string
           recorded_by?: string | null
           status: Database["public"]["Enums"]["attendance_status"]
           student_id: string
@@ -37,6 +39,7 @@ export type Database = {
           class_id?: string | null
           date?: string
           id?: string
+          period?: string
           recorded_by?: string | null
           status?: Database["public"]["Enums"]["attendance_status"]
           student_id?: string

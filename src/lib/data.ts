@@ -2,6 +2,7 @@ import { queryOptions } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
+import type { AttendancePeriod } from "@/lib/attendance-period";
 
 export type Status = "present" | "absent" | "late";
 export const STATUSES: Status[] = ["present", "absent", "late"];
@@ -47,14 +48,16 @@ export const attendanceRangeQuery = (from: string, to: string) =>
   queryOptions({
     queryKey: ["attendance", from, to],
     queryFn: async () => {
-      const rows: { student_id: string; class_id: string | null; date: string; status: Status }[] = [];
+      const rows: { student_id: string; class_id: string | null; date: string; period: AttendancePeriod; status: Status }[] = [];
       for (let page = 0; ; page++) {
         const { data, error } = await supabase
           .from("attendance")
-          .select("student_id,class_id,date,status")
+          .select("student_id,class_id,date,period,status")
           .gte("date", from)
           .lte("date", to)
           .order("date")
+          .order("student_id")
+          .order("period")
           .range(page * 1000, page * 1000 + 999);
         if (error) throw error;
         rows.push(...((data ?? []) as typeof rows));

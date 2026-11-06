@@ -30,4 +30,5 @@ use the editor.
 <!-- LOVABLE:END -->
 
 - Staff pages live under `src/routes/_authenticated/` and query the database from the browser client; access control is enforced by RLS (`has_role`/`is_staff`), so every new table needs matching role-based policies.
-- Attendance uniqueness is enforced by the `(student_id, date)` unique constraint and saves use upsert, so corrections update rather than duplicate.
+- Attendance uniqueness is enforced by `(student_id, date, period)` and saves use upsert, so corrections never overwrite a different session.
+- Shared attendance-period definitions and row construction live in a browser-safe library; attendance views select a period and aggregate recorded sessions consistently.

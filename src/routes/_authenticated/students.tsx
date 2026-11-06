@@ -21,7 +21,7 @@ type Search = { class?: string };
 
 export const Route = createFileRoute("/_authenticated/students")({
   validateSearch: (s: Record<string, unknown>): Search => (typeof s["class"] === "string" ? { class: s["class"] } : {}),
-  head: () => ({ meta: [{ title: "Students – Attendly" }, { name: "description", content: "Manage student records." }] }),
+  head: () => ({ meta: [{ title: "Students – Attendly" }, { name: "description", content: "Manage student records." }, { property: "og:title", content: "Students – Attendly" }, { property: "og:description", content: "Manage student records." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
   loader: ({ context: { queryClient: q } }) =>
     Promise.all([q.ensureQueryData(studentsQuery), q.ensureQueryData(classesQuery), q.ensureQueryData(gradesQuery)]),
   component: StudentsPage,

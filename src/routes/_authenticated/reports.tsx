@@ -11,9 +11,11 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { AttendancePeriodSelect } from "@/components/AttendancePeriodSelect";
+import { periodLabel as sessionLabel, type AttendancePeriod } from "@/lib/attendance-period";
 
 export const Route = createFileRoute("/_authenticated/reports")({
-  head: () => ({ meta: [{ title: "Reports – Attendly" }, { name: "description", content: "Attendance reports and exports." }] }),
+  head: () => ({ meta: [{ title: "Reports – Attendly" }, { name: "description", content: "Morning and afternoon attendance reports and exports." }, { property: "og:title", content: "Reports – Attendly" }, { property: "og:description", content: "Morning and afternoon attendance reports and exports." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
   loader: ({ context: { queryClient: q } }) => Promise.all([q.ensureQueryData(classesQuery), q.ensureQueryData(studentsQuery)]),
   component: Reports,
 });
@@ -36,8 +38,10 @@ function Reports() {
   const [ref, setRef] = useState(today());
   const [cls, setCls] = useState("all");
   const [studentId, setStudentId] = useState(students[0]?.id ?? "");
+  const [session, setSession] = useState<AttendancePeriod>("morning");
   const [from, to] = range(kind, ref);
-  const { data: rows = [], isLoading } = useQuery(attendanceRangeQuery(from, to));
+  const { data: allRows = [], isLoading } = useQuery(attendanceRangeQuery(from, to));
+  const rows = useMemo(() => allRows.filter((r) => r.period === session), [allRows, session]);
   const classMap = Object.fromEntries(classes.map((c) => [c.id, c.label]));
 
   const perStudent = useMemo(() => {
@@ -61,21 +65,21 @@ function Reports() {
   function exportData(type: "pdf" | "xlsx") {
     let title: string, head: string[], body: (string | number)[][];
     if (kind === "student" && student) {
-      title = `Attendance history - ${student.full_name}`;
-      head = ["Date", "Status", "Class"];
-      body = history.map((h) => [h.date, h.status, h.class_id ? classMap[h.class_id] ?? "" : ""]);
-      body.push(["Total", `${hs.rate}% attendance`, `${hs.present}P / ${hs.late}L / ${hs.absent}A`]);
+      title = `${sessionLabel(session)} attendance history - ${student.full_name}`;
+      head = ["Date", "Period", "Status", "Class"];
+      body = history.map((h) => [h.date, sessionLabel(h.period), h.status, h.class_id ? classMap[h.class_id] ?? "" : ""]);
+      body.push(["Total", sessionLabel(session), `${hs.rate}% attendance`, `${hs.present}P / ${hs.late}L / ${hs.absent}A`]);
     } else {
-      title = `${kind.charAt(0).toUpperCase() + kind.slice(1)} attendance report ${periodLabel}`;
+      title = `${sessionLabel(session)} ${kind} attendance report ${periodLabel}`;
       head = kind === "daily"
-        ? ["Student ID", "Name", "Class", "Status"]
-        : ["Student ID", "Name", "Class", "Present", "Late", "Absent", "Days", "Attendance %"];
+        ? ["Student ID", "Name", "Class", "Period", "Status"]
+        : ["Student ID", "Name", "Class", "Period", "Present", "Late", "Absent", "Sessions", "Attendance %"];
       body = perStudent.map((p) => {
-        const base = [p.s.student_code, p.s.full_name, p.s.class_id ? classMap[p.s.class_id] ?? "" : ""];
+        const base = [p.s.student_code, p.s.full_name, p.s.class_id ? classMap[p.s.class_id] ?? "" : "", sessionLabel(session)];
         return kind === "daily" ? [...base, p.status ?? "Not marked"] : [...base, p.present, p.late, p.absent, p.total, `${p.rate}%`];
       });
     }
-    const sub = `${scopeLabel} · ${periodLabel} · Overall ${total.rate}% (present ${total.present}, late ${total.late}, absent ${total.absent})`;
+    const sub = `${scopeLabel} · ${periodLabel} · ${sessionLabel(session)} · Overall ${total.rate}% (present ${total.present}, late ${total.late}, absent ${total.absent})`;
     if (type === "pdf") exportPdf(title, sub, head, body);
     else exportExcel(title, head, body);
   }
@@ -86,6 +90,7 @@ function Reports() {
         <Button variant="outline" onClick={() => exportData("pdf")}><FileText /> PDF</Button>
         <Button variant="outline" onClick={() => exportData("xlsx")}><FileSpreadsheet /> Excel</Button>
       </PageHeader>
+      <div className="mb-4 max-w-sm"><AttendancePeriodSelect value={session} onChange={setSession} /></div>
       <Tabs value={kind} onValueChange={(v) => setKind(v as Kind)} className="mb-4">
         <TabsList className="flex-wrap">
           <TabsTrigger value="daily">Daily</TabsTrigger>
@@ -127,17 +132,18 @@ function Reports() {
       <div className="overflow-x-auto rounded-xl border bg-card shadow-card">
         {isLoading ? <p className="p-6 text-sm text-muted-foreground">Loading…</p> : kind === "student" ? (
           <Table>
-            <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Day</TableHead><TableHead>Class</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Day</TableHead><TableHead>Period</TableHead><TableHead>Class</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
             <TableBody>
               {history.map((h) => (
-                <TableRow key={h.date}>
+                <TableRow key={`${h.date}:${h.period}`}>
                   <TableCell>{h.date}</TableCell>
                   <TableCell>{format(new Date(h.date + "T00:00"), "EEEE")}</TableCell>
+                  <TableCell>{sessionLabel(h.period)}</TableCell>
                   <TableCell>{h.class_id ? classMap[h.class_id] : "—"}</TableCell>
                   <TableCell><StatusBadge status={h.status} /></TableCell>
                 </TableRow>
               ))}
-              {!history.length && <TableRow><TableCell colSpan={4} className="py-10 text-center text-muted-foreground">No records.</TableCell></TableRow>}
+              {!history.length && <TableRow><TableCell colSpan={5} className="py-10 text-center text-muted-foreground">No records.</TableCell></TableRow>}
             </TableBody>
           </Table>
         ) : (

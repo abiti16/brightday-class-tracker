@@ -8,11 +8,14 @@ import { PageHeader } from "@/components/StatusBadge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 import { Button } from "@/components/ui/button";
+import { useState } from "react";
+import { AttendancePeriodSelect } from "@/components/AttendancePeriodSelect";
+import type { AttendancePeriod } from "@/lib/attendance-period";
 
 const from = () => format(subDays(new Date(), 13), "yyyy-MM-dd");
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
-  head: () => ({ meta: [{ title: "Dashboard – Attendly" }, { name: "description", content: "Attendance overview for today." }] }),
+  head: () => ({ meta: [{ title: "Dashboard – Attendly" }, { name: "description", content: "Morning and afternoon attendance overview." }, { property: "og:title", content: "Dashboard – Attendly" }, { property: "og:description", content: "Morning and afternoon attendance overview." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
   loader: ({ context: { queryClient: q } }) =>
     Promise.all([q.ensureQueryData(studentsQuery), q.ensureQueryData(classesQuery), q.ensureQueryData(attendanceRangeQuery(from(), today()))]),
   component: Dashboard,
@@ -27,7 +30,9 @@ const chartConfig = {
 function Dashboard() {
   const { data: students } = useSuspenseQuery(studentsQuery);
   const { data: classes } = useSuspenseQuery(classesQuery);
-  const { data: rows } = useSuspenseQuery(attendanceRangeQuery(from(), today()));
+  const { data: allRows } = useSuspenseQuery(attendanceRangeQuery(from(), today()));
+  const [session, setSession] = useState<AttendancePeriod>("morning");
+  const rows = allRows.filter((r) => r.period === session);
   const t = today();
   const todayRows = rows.filter((r) => r.date === t);
   const s = summarize(todayRows);
@@ -65,9 +70,10 @@ function Dashboard() {
           <Link to="/attendance">Take attendance</Link>
         </Button>
       </PageHeader>
+      <div className="mb-4 max-w-sm"><AttendancePeriodSelect value={session} onChange={setSession} /></div>
       {unmarked > 0 && (
         <div className="mb-6 rounded-lg border border-primary/20 bg-accent px-4 py-3 text-sm text-accent-foreground">
-          {todayRows.length === 0 ? "No attendance recorded yet today." : `${unmarked} students have not been marked today.`}
+          {todayRows.length === 0 ? `No ${session} attendance recorded yet today.` : `${unmarked} students have not been marked this ${session}.`}
         </div>
       )}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">

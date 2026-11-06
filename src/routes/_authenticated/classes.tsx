@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Checkbox } from "@/components/ui/checkbox";
 
 export const Route = createFileRoute("/_authenticated/classes")({
-  head: () => ({ meta: [{ title: "Classes – Attendly" }, { name: "description", content: "Manage grades and classes." }] }),
+  head: () => ({ meta: [{ title: "Classes – Attendly" }, { name: "description", content: "Manage grades and classes." }, { property: "og:title", content: "Classes – Attendly" }, { property: "og:description", content: "Manage grades and classes." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
   loader: ({ context: { queryClient: q } }) =>
     Promise.all([q.ensureQueryData(classesQuery), q.ensureQueryData(gradesQuery), q.ensureQueryData(studentsQuery)]),
   component: ClassesPage,

@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export const Route = createFileRoute("/_authenticated/staff")({
-  head: () => ({ meta: [{ title: "Staff & roles – Attendly" }, { name: "description", content: "Manage staff access." }] }),
+  head: () => ({ meta: [{ title: "Staff & roles – Attendly" }, { name: "description", content: "Manage staff access." }, { property: "og:title", content: "Staff & roles – Attendly" }, { property: "og:description", content: "Manage staff access." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
   component: Staff,
 });
 

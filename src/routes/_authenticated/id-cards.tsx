@@ -16,6 +16,8 @@ export const Route = createFileRoute("/_authenticated/id-cards")({
       { name: "description", content: "Printable student ID cards with QR codes for fast attendance scanning." },
       { property: "og:title", content: "Student ID cards – Attendly" },
       { property: "og:description", content: "Printable student ID cards with QR codes." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   loader: ({ context }) =>

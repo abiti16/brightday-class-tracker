@@ -8,6 +8,13 @@
       "when": 1793960531650,
       "tag": "0000_migration",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793974524420,
+      "tag": "0001_attendance_morning_afternoon",
+      "breakpoints": true
     }
   ]
 }

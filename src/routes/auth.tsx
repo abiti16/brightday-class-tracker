@@ -17,6 +17,8 @@ export const Route = createFileRoute("/auth")({
       { name: "description", content: "Sign in to manage student attendance." },
       { property: "og:title", content: "Sign in – Attendly" },
       { property: "og:description", content: "Sign in to manage student attendance." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: AuthPage,

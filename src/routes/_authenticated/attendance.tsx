@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState, type SetStateAction } from "react";
 import { toast } from "sonner";
 import { QrCode, Search } from "lucide-react";
 import { QrScanner } from "@/components/QrScanner";
@@ -12,9 +12,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { AttendancePeriodSelect } from "@/components/AttendancePeriodSelect";
+import { ATTENDANCE_CONFLICT, attendanceRows, periodLabel, type AttendancePeriod } from "@/lib/attendance-period";
 
 export const Route = createFileRoute("/_authenticated/attendance")({
-  head: () => ({ meta: [{ title: "Take attendance – Attendly" }, { name: "description", content: "Mark students present, absent or late." }] }),
+  head: () => ({ meta: [{ title: "Take attendance – Attendly" }, { name: "description", content: "Record morning and afternoon student attendance." }, { property: "og:title", content: "Take attendance – Attendly" }, { property: "og:description", content: "Record morning and afternoon student attendance." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
   loader: ({ context }) => context.queryClient.ensureQueryData(classesQuery),
   component: AttendancePage,
 });
@@ -31,28 +33,34 @@ function AttendancePage() {
   const { data: classes } = useSuspenseQuery(classesQuery);
   const [date, setDate] = useState(today());
   const [classId, setClassId] = useState(classes[0]?.id ?? "");
-  const [marks, setMarks] = useState<Record<string, Status>>({});
+  const [period, setPeriod] = useState<AttendancePeriod>("morning");
+  const [draft, setDraft] = useState<{ scope: string; values: Record<string, Status> }>({ scope: "", values: {} });
+  const scope = `${classId}:${date}:${period}`;
   const [search, setSearch] = useState("");
   const [saving, setSaving] = useState(false);
   const [scanning, setScanning] = useState(false);
   const qc = useQueryClient();
 
   const { data, isLoading } = useQuery({
-    queryKey: ["roll", classId, date],
+    queryKey: ["roll", classId, date, period],
     enabled: !!classId,
     queryFn: async () => {
       const [{ data: st, error: e1 }, { data: att, error: e2 }] = await Promise.all([
         supabase.from("students").select("id,student_code,full_name,gender").eq("class_id", classId).order("full_name"),
-        supabase.from("attendance").select("student_id,status").eq("date", date).eq("class_id", classId),
+        supabase.from("attendance").select("student_id,status").eq("date", date).eq("class_id", classId).eq("period", period),
       ]);
       if (e1 || e2) throw e1 ?? e2;
       return { students: st ?? [], existing: Object.fromEntries((att ?? []).map((a) => [a.student_id, a.status as Status])) };
     },
   });
 
-  useEffect(() => {
-    if (data) setMarks(data.existing);
-  }, [data]);
+  const marks = draft.scope === scope ? draft.values : data?.existing ?? {};
+  function setMarks(update: SetStateAction<Record<string, Status>>) {
+    setDraft((previous) => {
+      const current = previous.scope === scope ? previous.values : data?.existing ?? {};
+      return { scope, values: typeof update === "function" ? update(current) : update };
+    });
+  }
 
   const locked = !isAdmin && date !== today();
   const alreadySaved = data && Object.keys(data.existing).length > 0;
@@ -70,19 +78,18 @@ function AttendancePage() {
   }
 
   async function save() {
-    if (!data) return;
+    if (!data || locked || saving) return;
     const missing = data.students.filter((s) => !marks[s.id]);
     if (missing.length) { toast.error(`Mark all students first (${missing.length} remaining).`); return; }
     if (date > today()) { toast.error("You cannot record attendance for a future date."); return; }
     setSaving(true);
-    const rows = data.students.map((s) => ({
-      student_id: s.id, class_id: classId, date, status: marks[s.id]!, recorded_by: me?.id ?? null, updated_at: new Date().toISOString(),
-    }));
-    // unique (student_id, date) prevents duplicates; upsert updates existing records instead
-    const { error } = await supabase.from("attendance").upsert(rows, { onConflict: "student_id,date" });
+    const rows = attendanceRows(data.students, marks, classId, date, period, me?.id ?? null);
+    // Corrections update only the selected student's date and period.
+    const { error } = await supabase.from("attendance").upsert(rows, { onConflict: ATTENDANCE_CONFLICT });
     setSaving(false);
     if (error) { toast.error(error.message.includes("row-level") ? "You are not allowed to change attendance for this date." : error.message); return; }
-    toast.success(alreadySaved ? "Attendance corrected" : "Attendance saved");
+    toast.success(`${periodLabel(period)} attendance ${alreadySaved ? "corrected" : "saved"}`);
+    setDraft({ scope: "", values: {} });
     qc.invalidateQueries({ queryKey: ["roll"] });
     qc.invalidateQueries({ queryKey: ["attendance"] });
   }
@@ -90,6 +97,7 @@ function AttendancePage() {
   return (
     <div className="mx-auto max-w-5xl">
       <PageHeader title="Take attendance" description={isAdmin ? "Admins can record or correct any past date." : "Teachers can record and correct today's attendance."} />
+      <div className="mb-4 max-w-sm"><AttendancePeriodSelect value={period} onChange={setPeriod} /></div>
       <div className="mb-4 grid gap-3 rounded-xl border bg-card p-4 shadow-card sm:grid-cols-3">
         <div>
           <label className="mb-1 block text-xs font-semibold text-muted-foreground">Date</label>
@@ -153,7 +161,8 @@ function AttendancePage() {
                 </div>
                 <div className="grid grid-cols-3 gap-1.5 sm:w-72">
                   {STATUSES.map((st) => (
-                    <button
+                    <Button
+                      variant="outline"
                       key={st}
                       type="button"
                       disabled={locked}
@@ -162,7 +171,7 @@ function AttendancePage() {
                       className={cn("rounded-md border px-2 py-1.5 text-sm font-semibold capitalize transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60", statusStyle[st])}
                     >
                       {st}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </li>
@@ -172,7 +181,7 @@ function AttendancePage() {
       </div>
       <div className="sticky bottom-4 mt-4 flex justify-end">
         <Button size="lg" onClick={save} disabled={saving || locked || !data?.students.length} className="shadow-card">
-          {saving ? "Saving…" : alreadySaved ? "Save corrections" : "Save attendance"}
+          {saving ? "Saving…" : alreadySaved ? `Save ${period} corrections` : `Save ${period} attendance`}
         </Button>
       </div>
     </div>
