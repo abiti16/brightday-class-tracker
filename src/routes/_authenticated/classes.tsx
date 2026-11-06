@@ -5,7 +5,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Plus, Trash2, UserPlus, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { classesQuery, gradesQuery, nameSchema, studentsQuery } from "@/lib/data";
+import { classesQuery, departmentsQuery, gradesQuery, nameSchema, studentsQuery } from "@/lib/data";
 import { useMe } from "@/lib/session";
 import { PageHeader } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 export const Route = createFileRoute("/_authenticated/classes")({
   head: () => ({ meta: [{ title: "Classes – Attendly" }, { name: "description", content: "Manage grades and classes." }, { property: "og:title", content: "Classes – Attendly" }, { property: "og:description", content: "Manage grades and classes." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
   loader: ({ context: { queryClient: q } }) =>
-    Promise.all([q.ensureQueryData(classesQuery), q.ensureQueryData(gradesQuery), q.ensureQueryData(studentsQuery)]),
+    Promise.all([q.ensureQueryData(classesQuery), q.ensureQueryData(gradesQuery), q.ensureQueryData(studentsQuery), q.ensureQueryData(departmentsQuery)]),
   component: ClassesPage,
 });
 
@@ -27,10 +27,12 @@ function ClassesPage() {
   const { data: grades } = useSuspenseQuery(gradesQuery);
   const { data: classes } = useSuspenseQuery(classesQuery);
   const { data: students } = useSuspenseQuery(studentsQuery);
+  const { data: departments } = useSuspenseQuery(departmentsQuery);
   const qc = useQueryClient();
   const [gradeName, setGradeName] = useState("");
   const [className, setClassName] = useState("");
   const [classGrade, setClassGrade] = useState("");
+  const [classDepartment, setClassDepartment] = useState("");
   const [assignTo, setAssignTo] = useState<string | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
 
@@ -48,10 +50,10 @@ function ClassesPage() {
   }
   async function addClass(e: FormEvent) {
     e.preventDefault();
-    if (!classGrade) { toast.error("Select a grade"); return; }
+    if (!classGrade || !classDepartment) { toast.error("Select a grade and department"); return; }
     const r = nameSchema.safeParse(className);
     if (!r.success) { toast.error(r.error.issues[0]?.message ?? "Invalid"); return; }
-    const { error } = await supabase.from("classes").insert({ name: r.data, grade_id: classGrade });
+    const { error } = await supabase.from("classes").insert({ name: r.data, grade_id: classGrade, department_id: classDepartment });
     if (error) { toast.error(error.code === "23505" ? "That class already exists in this grade" : error.message); return; }
     toast.success("Class created");
     setClassName("");
@@ -76,6 +78,13 @@ function ClassesPage() {
 
   const target = classes.find((c) => c.id === assignTo);
 
+  async function assignDepartment(id: string, department_id: string) {
+    const { error } = await supabase.from("classes").update({ department_id }).eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Class department updated");
+    await qc.invalidateQueries();
+  }
+
   return (
     <div className="mx-auto max-w-7xl">
       <PageHeader title="Classes" description={`${grades.length} grades · ${classes.length} classes`} />
@@ -85,10 +94,14 @@ function ClassesPage() {
             <Input placeholder="New grade, e.g. Grade 12" value={gradeName} onChange={(e) => setGradeName(e.target.value)} />
             <Button type="submit"><Plus /> Grade</Button>
           </form>
-          <form onSubmit={addClass} className="flex flex-wrap gap-2 rounded-xl border bg-card p-4 shadow-card sm:flex-nowrap">
+          <form onSubmit={addClass} className="flex flex-wrap gap-2 rounded-xl border bg-card p-4 shadow-card">
             <Select value={classGrade} onValueChange={setClassGrade}>
               <SelectTrigger className="sm:w-40"><SelectValue placeholder="Grade" /></SelectTrigger>
               <SelectContent>{grades.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}</SelectContent>
+            </Select>
+            <Select value={classDepartment} onValueChange={setClassDepartment}>
+              <SelectTrigger className="sm:w-44" aria-label="New class department"><SelectValue placeholder="Department" /></SelectTrigger>
+              <SelectContent>{departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
             </Select>
             <Input placeholder="Class name, e.g. Section C" value={className} onChange={(e) => setClassName(e.target.value)} />
             <Button type="submit"><Plus /> Class</Button>
@@ -112,6 +125,10 @@ function ClassesPage() {
                       <span className="flex items-center gap-1 text-sm text-muted-foreground"><Users className="size-4" />{members.length}</span>
                     </CardHeader>
                     <CardContent>
+                      {isAdmin ? <div className="mb-3"><Select value={c.department_id ?? "unassigned"} onValueChange={(v) => assignDepartment(c.id, v)}>
+                        <SelectTrigger aria-label={`Department for ${c.label}`}><SelectValue /></SelectTrigger>
+                        <SelectContent><SelectItem value="unassigned" disabled>Unassigned department</SelectItem>{departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
+                      </Select></div> : <p className="mb-3 text-sm font-medium text-primary">{c.department}</p>}
                       <p className="mb-3 line-clamp-2 text-sm text-muted-foreground">
                         {members.slice(0, 4).map((m) => m.full_name).join(", ") || "No students yet"}
                         {members.length > 4 && ` +${members.length - 4} more`}

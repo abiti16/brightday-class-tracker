@@ -1,24 +1,27 @@
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-export type Role = "admin" | "teacher";
+export type Role = "admin" | "teacher" | "manager";
 
 export const meQuery = queryOptions({
   queryKey: ["me"],
   queryFn: async () => {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return null;
-    const [{ data: roles }, { data: profile }] = await Promise.all([
+    const [{ data: roles, error: roleError }, { data: profile }, { data: membership, error: membershipError }] = await Promise.all([
       supabase.from("user_roles").select("role").eq("user_id", u.user.id),
       supabase.from("profiles").select("full_name,email").eq("id", u.user.id).maybeSingle(),
+      supabase.from("department_memberships").select("department_id,role,departments(name)").eq("user_id", u.user.id).maybeSingle(),
     ]);
+    if (roleError || membershipError) throw roleError ?? membershipError;
     const list = (roles ?? []).map((r) => r.role as Role);
-    const role: Role | null = list.includes("admin") ? "admin" : list.includes("teacher") ? "teacher" : null;
+    const role: Role | null = list.includes("admin") ? "admin" : membership?.role === "manager" ? "manager" : membership ? "teacher" : null;
     return {
       id: u.user.id,
       email: u.user.email ?? "",
       name: profile?.full_name || u.user.email || "User",
       role,
+      membership: membership ? { department_id: membership.department_id, role: membership.role as "manager" | "teacher", name: membership.departments?.name ?? "" } : null,
     };
   },
 });

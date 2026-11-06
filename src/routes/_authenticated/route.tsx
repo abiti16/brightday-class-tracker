@@ -33,7 +33,7 @@ function AppSidebar() {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const { state, setOpenMobile } = useSidebar();
   const collapsed = state === "collapsed";
-  const items = me?.role === "admin" ? [...nav, { title: "Staff & roles", url: "/staff", icon: ShieldCheck } as const] : nav;
+  const items = me?.role === "admin" || me?.role === "manager" ? [...nav, { title: "Staff & roles", url: "/staff", icon: ShieldCheck } as const] : nav;
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
@@ -67,6 +67,7 @@ function AppSidebar() {
           <div className="px-2 pb-1 text-xs text-sidebar-foreground/80">
             <div className="truncate font-semibold text-sidebar-foreground">{me.name}</div>
             <div className="capitalize">{me.role ?? "pending approval"}</div>
+            {me.membership && <div>{me.membership.name}</div>}
           </div>
         )}
       </SidebarFooter>

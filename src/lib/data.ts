@@ -14,11 +14,11 @@ export const classesQuery = queryOptions({
   queryFn: async () => {
     const { data, error } = await supabase
       .from("classes")
-      .select("id,name,grade_id,grades(name)")
+      .select("id,name,grade_id,department_id,grades(name),departments(name)")
       .order("name");
     if (error) throw error;
     return (data ?? [])
-      .map((c) => ({ id: c.id, name: c.name, grade_id: c.grade_id, grade: c.grades?.name ?? "", label: `${c.grades?.name ?? ""} – ${c.name}` }))
+      .map((c) => ({ id: c.id, name: c.name, grade_id: c.grade_id, department_id: c.department_id, department: c.departments?.name ?? "Unassigned", grade: c.grades?.name ?? "", label: `${c.grades?.name ?? ""} – ${c.name}${c.departments?.name ? ` · ${c.departments.name}` : ""}` }))
       .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
   },
 });
@@ -29,6 +29,15 @@ export const gradesQuery = queryOptions({
     const { data, error } = await supabase.from("grades").select("id,name").order("name");
     if (error) throw error;
     return (data ?? []).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  },
+});
+
+export const departmentsQuery = queryOptions({
+  queryKey: ["departments"],
+  queryFn: async () => {
+    const { data, error } = await supabase.from("departments").select("id,name").order("created_at");
+    if (error) throw error;
+    return data ?? [];
   },
 });
 

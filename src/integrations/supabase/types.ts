@@ -65,23 +65,33 @@ export type Database = {
       classes: {
         Row: {
           created_at: string
+          department_id: string | null
           grade_id: string
           id: string
           name: string
         }
         Insert: {
           created_at?: string
+          department_id?: string | null
           grade_id: string
           id?: string
           name: string
         }
         Update: {
           created_at?: string
+          department_id?: string | null
           grade_id?: string
           id?: string
           name?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "classes_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "classes_grade_id_fkey"
             columns: ["grade_id"]
@@ -90,6 +100,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      department_memberships: {
+        Row: {
+          department_id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          department_id: string
+          role: string
+          user_id: string
+        }
+        Update: {
+          department_id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "department_memberships_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "department_memberships_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      departments: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
       }
       grades: {
         Row: {
@@ -191,6 +252,26 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_department_teacher: {
+        Args: { _department: string; _email: string }
+        Returns: undefined
+      }
+      can_access_class: {
+        Args: { _class: string; _user: string }
+        Returns: boolean
+      }
+      can_access_department: {
+        Args: { _department: string; _user: string }
+        Returns: boolean
+      }
+      can_read_staff_profile: {
+        Args: { _target: string; _user: string }
+        Returns: boolean
+      }
+      can_record_attendance: {
+        Args: { _class: string; _date: string; _user: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -199,6 +280,18 @@ export type Database = {
         Returns: boolean
       }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
+      manages_department: {
+        Args: { _department: string; _user: string }
+        Returns: boolean
+      }
+      set_department_access: {
+        Args: { _department: string; _role: string; _target: string }
+        Returns: undefined
+      }
+      set_school_role: {
+        Args: { _role: string; _target: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "teacher"

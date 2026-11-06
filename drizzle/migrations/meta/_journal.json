@@ -15,6 +15,13 @@
       "when": 1793974524420,
       "tag": "0001_attendance_morning_afternoon",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793975627758,
+      "tag": "0002_department_attendance_access",
+      "breakpoints": true
     }
   ]
 }

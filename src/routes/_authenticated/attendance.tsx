@@ -7,6 +7,7 @@ import { QrScanner } from "@/components/QrScanner";
 import { supabase } from "@/integrations/supabase/client";
 import { classesQuery, STATUSES, today, type Status } from "@/lib/data";
 import { useMe } from "@/lib/session";
+import { canRecordAttendance } from "@/lib/department-access";
 import { PageHeader } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,7 +63,7 @@ function AttendancePage() {
     });
   }
 
-  const locked = !isAdmin && date !== today();
+  const locked = !canRecordAttendance(me?.role, me?.membership, classes.find((c) => c.id === classId)?.department_id, date, today());
   const alreadySaved = data && Object.keys(data.existing).length > 0;
   const visible = useMemo(
     () => (data?.students ?? []).filter((s) => (s.full_name + s.student_code).toLowerCase().includes(search.toLowerCase())),
@@ -96,7 +97,7 @@ function AttendancePage() {
 
   return (
     <div className="mx-auto max-w-5xl">
-      <PageHeader title="Take attendance" description={isAdmin ? "Admins can record or correct any past date." : "Teachers can record and correct today's attendance."} />
+      <PageHeader title="Take attendance" description={me?.membership?.name ?? (isAdmin ? "All departments" : "Attendance")} />
       <div className="mb-4 max-w-sm"><AttendancePeriodSelect value={period} onChange={setPeriod} /></div>
       <div className="mb-4 grid gap-3 rounded-xl border bg-card p-4 shadow-card sm:grid-cols-3">
         <div>
@@ -140,7 +141,7 @@ function AttendancePage() {
           <div className="mx-auto max-w-sm"><QrScanner onScan={handleScan} /></div>
         </div>
       )}
-      {locked && <p className="mb-3 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">View only — corrections to past dates require an administrator.</p>}
+      {locked && <p className="mb-3 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">View only — past corrections require your department manager or a school administrator.</p>}
       {alreadySaved && !locked && <p className="mb-3 rounded-md bg-accent px-3 py-2 text-sm text-accent-foreground">Attendance already recorded for this date. Saving will update the existing records.</p>}
 
       <div className="overflow-hidden rounded-xl border bg-card shadow-card">
