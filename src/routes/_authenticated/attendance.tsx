@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Search } from "lucide-react";
+import { QrCode, Search } from "lucide-react";
+import { QrScanner } from "@/components/QrScanner";
 import { supabase } from "@/integrations/supabase/client";
 import { classesQuery, STATUSES, today, type Status } from "@/lib/data";
 import { useMe } from "@/lib/session";
@@ -33,6 +34,7 @@ function AttendancePage() {
   const [marks, setMarks] = useState<Record<string, Status>>({});
   const [search, setSearch] = useState("");
   const [saving, setSaving] = useState(false);
+  const [scanning, setScanning] = useState(false);
   const qc = useQueryClient();
 
   const { data, isLoading } = useQuery({
@@ -59,6 +61,13 @@ function AttendancePage() {
     [data, search],
   );
   const counts = STATUSES.map((s) => [s, Object.values(marks).filter((m) => m === s).length] as const);
+
+  function handleScan(code: string) {
+    const s = data?.students.find((x) => x.student_code.toLowerCase() === code.trim().toLowerCase());
+    if (!s) { toast.error(`ID ${code} is not in this class.`); return; }
+    setMarks((m) => ({ ...m, [s.id]: "present" }));
+    toast.success(`${s.full_name} marked present`);
+  }
 
   async function save() {
     if (!data) return;
@@ -108,12 +117,21 @@ function AttendancePage() {
         <Button size="sm" variant="outline" disabled={locked || !data} onClick={() => setMarks(Object.fromEntries((data?.students ?? []).map((s) => [s.id, "present" as Status])))}>
           Mark all present
         </Button>
+        <Button size="sm" variant={scanning ? "default" : "outline"} disabled={locked || !data} onClick={() => setScanning(!scanning)}>
+          <QrCode /> {scanning ? "Stop scanning" : "Scan ID cards"}
+        </Button>
         <div className="flex-1" />
         {counts.map(([s, n]) => (
           <span key={s} className="text-sm capitalize text-muted-foreground"><b className="text-foreground">{n}</b> {s}</span>
         ))}
       </div>
 
+      {scanning && !locked && (
+        <div className="mb-4 rounded-xl border bg-card p-4 shadow-card">
+          <p className="mb-2 text-sm text-muted-foreground">Hold a student's ID card QR code up to the camera. Scanned students are marked present — remember to save.</p>
+          <div className="mx-auto max-w-sm"><QrScanner onScan={handleScan} /></div>
+        </div>
+      )}
       {locked && <p className="mb-3 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">View only — corrections to past dates require an administrator.</p>}
       {alreadySaved && !locked && <p className="mb-3 rounded-md bg-accent px-3 py-2 text-sm text-accent-foreground">Attendance already recorded for this date. Saving will update the existing records.</p>}
 

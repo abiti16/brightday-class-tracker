@@ -1,6 +1,6 @@
 import { createFileRoute, Link, Outlet, redirect, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { BarChart3, CalendarCheck, ClipboardCheck, GraduationCap, LayoutDashboard, LogOut, ShieldCheck, Users } from "lucide-react";
+import { BarChart3, CalendarCheck, ClipboardCheck, GraduationCap, IdCard, LayoutDashboard, LogOut, ShieldCheck, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { meQuery, useMe } from "@/lib/session";
 import {
@@ -23,6 +23,7 @@ const nav = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Attendance", url: "/attendance", icon: ClipboardCheck },
   { title: "Students", url: "/students", icon: Users },
+  { title: "ID cards", url: "/id-cards", icon: IdCard },
   { title: "Classes", url: "/classes", icon: GraduationCap },
   { title: "Reports", url: "/reports", icon: BarChart3 },
 ] as const;
