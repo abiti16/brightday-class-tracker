@@ -28,3 +28,6 @@ use the editor.
   own key and store it in Secrets.
 - **Secrets.** Lovable manages them. Do not put secret values in the repo.
 <!-- LOVABLE:END -->
+
+- Staff pages live under `src/routes/_authenticated/` and query the database from the browser client; access control is enforced by RLS (`has_role`/`is_staff`), so every new table needs matching role-based policies.
+- Attendance uniqueness is enforced by the `(student_id, date)` unique constraint and saves use upsert, so corrections update rather than duplicate.
