@@ -9,9 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 
 const fields = [
-  ["manager_record_today", "Managers", "Record today"],
+  ["manager_record_today", "Managers", "Take new attendance today"],
+  ["manager_edit_today", "Managers", "Edit / retake saved attendance today"],
   ["manager_correct_past", "Managers", "Enter or correct past dates"],
-  ["teacher_record_today", "Teachers", "Record today"],
+  ["teacher_record_today", "Teachers", "Take new attendance today"],
+  ["teacher_edit_today", "Teachers", "Edit / retake saved attendance today"],
   ["teacher_correct_past", "Teachers", "Enter or correct past dates"],
 ] as const;
 
@@ -80,18 +82,18 @@ export function DepartmentPermissions() {
 
   return <section className="mb-8 border-b pb-6">
     <h2 className="mb-2 flex items-center gap-2 text-lg font-bold"><ShieldCheck className="size-5 text-primary" />Attendance permissions</h2>
-    <p className="mb-4 text-sm text-muted-foreground">Both Morning and Afternoon · Assigned department only · Administrators retain school-wide access · Future dates remain blocked</p>
+    <p className="mb-4 text-sm text-muted-foreground">Both Morning and Afternoon · Assigned department only · Super admin grants individual staff access · Future dates remain blocked</p>
     <div className="grid gap-4 lg:grid-cols-2">{departments.map((d) => {
       const values = drafts[d.id] ?? d;
-      return <div key={d.id} className="rounded-lg border bg-card p-4">
+      return <div key={d.id} className="min-w-0 rounded-lg border bg-card p-4">
         <h3 className="mb-3 font-bold">{d.name}</h3>
         {fields.map(([key, role, label], i) => <div key={key} className="flex items-center justify-between gap-4 border-t py-3">
-          <label htmlFor={`${d.id}-${key}`} className="min-w-0 text-sm">{i % 2 === 0 && <span className="block font-semibold">{role}</span>}{label}</label>
-          <Switch id={`${d.id}-${key}`} aria-label={`${d.name}: ${role} ${label}`} checked={values[key]} disabled={running || !!saving} onCheckedChange={(checked) => setDrafts((old) => ({ ...old, [d.id]: { manager_record_today: values.manager_record_today, manager_correct_past: values.manager_correct_past, teacher_record_today: values.teacher_record_today, teacher_correct_past: values.teacher_correct_past, [key]: checked } }))} />
+          <label htmlFor={`${d.id}-${key}`} className="min-w-0 text-sm">{i % 3 === 0 && <span className="block font-semibold">{role}</span>}{label}</label>
+          <Switch id={`${d.id}-${key}`} aria-label={`${d.name}: ${role} ${label}`} checked={values[key]} disabled={running || !!saving} onCheckedChange={(checked) => setDrafts((old) => ({ ...old, [d.id]: { manager_edit_today: values.manager_edit_today, teacher_edit_today: values.teacher_edit_today, manager_record_today: values.manager_record_today, manager_correct_past: values.manager_correct_past, teacher_record_today: values.teacher_record_today, teacher_correct_past: values.teacher_correct_past, [key]: checked } }))} />
         </div>)}
         {values.teacher_correct_past && <p className="mb-3 text-sm text-warning">Teachers can change historical attendance.</p>}
         {!values.manager_record_today && !values.teacher_record_today && <p className="mb-3 text-sm text-destructive">Only school administrators can record today.</p>}
-        <Button onClick={() => void save(d.id)} disabled={!drafts[d.id] || !!saving || running}><Save />{saving === d.id ? "Saving…" : `Save permissions for ${d.name}`}</Button>
+        <Button className="h-auto min-h-9 max-w-full whitespace-normal" onClick={() => void save(d.id)} disabled={!drafts[d.id] || !!saving || running}><Save className="shrink-0" />{saving === d.id ? "Saving…" : `Save permissions for ${d.name}`}</Button>
       </div>;
     })}</div>
     <div className="mt-6">

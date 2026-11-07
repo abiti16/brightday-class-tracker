@@ -15,3 +15,5 @@
 - [ ] Add AI Gateway review of access conflicts without automatic permission changes.
 - [ ] Test permissions and verify signed-in settings, saving and AI review.
 - [ ] Commit verified changes.
+- [ ] Make the requesting account super admin; only super admin grants attendance recording and editing to staff.
+- [ ] Separate first recording from editing or retaking saved Morning/Afternoon sessions.

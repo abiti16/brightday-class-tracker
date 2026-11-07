@@ -127,16 +127,22 @@ export type Database = {
       }
       department_memberships: {
         Row: {
+          can_edit: boolean
+          can_take: boolean
           department_id: string
           role: string
           user_id: string
         }
         Insert: {
+          can_edit?: boolean
+          can_take?: boolean
           department_id: string
           role: string
           user_id: string
         }
         Update: {
+          can_edit?: boolean
+          can_take?: boolean
           department_id?: string
           role?: string
           user_id?: string
@@ -163,27 +169,33 @@ export type Database = {
           created_at: string
           id: string
           manager_correct_past: boolean
+          manager_edit_today: boolean
           manager_record_today: boolean
           name: string
           teacher_correct_past: boolean
+          teacher_edit_today: boolean
           teacher_record_today: boolean
         }
         Insert: {
           created_at?: string
           id?: string
           manager_correct_past?: boolean
+          manager_edit_today?: boolean
           manager_record_today?: boolean
           name: string
           teacher_correct_past?: boolean
+          teacher_edit_today?: boolean
           teacher_record_today?: boolean
         }
         Update: {
           created_at?: string
           id?: string
           manager_correct_past?: boolean
+          manager_edit_today?: boolean
           manager_record_today?: boolean
           name?: string
           teacher_correct_past?: boolean
+          teacher_edit_today?: boolean
           teacher_record_today?: boolean
         }
         Relationships: []
@@ -265,6 +277,26 @@ export type Database = {
           },
         ]
       }
+      super_admins: {
+        Row: {
+          user_id: string
+        }
+        Insert: {
+          user_id: string
+        }
+        Update: {
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "super_admins_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string
@@ -300,6 +332,10 @@ export type Database = {
         Args: { _department: string; _user: string }
         Returns: boolean
       }
+      can_edit_attendance: {
+        Args: { _class: string; _date: string; _user: string }
+        Returns: boolean
+      }
       can_read_staff_profile: {
         Args: { _target: string; _user: string }
         Returns: boolean
@@ -316,6 +352,7 @@ export type Database = {
         Returns: boolean
       }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
+      is_super_admin: { Args: { _user: string }; Returns: boolean }
       manages_department: {
         Args: { _department: string; _user: string }
         Returns: boolean

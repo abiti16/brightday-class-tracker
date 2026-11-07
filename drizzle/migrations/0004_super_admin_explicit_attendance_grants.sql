@@ -1,0 +1,41 @@
+CREATE TABLE public.super_admins (user_id uuid PRIMARY KEY REFERENCES public.profiles(id));
+GRANT SELECT ON public.super_admins TO authenticated;
+GRANT ALL ON public.super_admins TO service_role;
+ALTER TABLE public.super_admins ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "own super admin status" ON public.super_admins FOR SELECT TO authenticated USING(user_id=auth.uid());
+CREATE FUNCTION public.is_super_admin(_user uuid) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public AS $$ SELECT EXISTS(SELECT 1 FROM public.super_admins WHERE user_id=_user) $$;
+REVOKE ALL ON FUNCTION public.is_super_admin(uuid) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.is_super_admin(uuid) TO authenticated,service_role;
+ALTER TABLE public.department_memberships ADD COLUMN can_take boolean NOT NULL DEFAULT false, ADD COLUMN can_edit boolean NOT NULL DEFAULT false;
+ALTER TABLE public.departments ADD COLUMN manager_edit_today boolean NOT NULL DEFAULT false, ADD COLUMN teacher_edit_today boolean NOT NULL DEFAULT false;
+DROP POLICY "admin department write" ON public.departments;
+CREATE POLICY "super admin department write" ON public.departments FOR ALL TO authenticated USING(public.is_super_admin(auth.uid())) WITH CHECK(public.is_super_admin(auth.uid()));
+DROP POLICY "admin membership write" ON public.department_memberships;
+CREATE POLICY "super admin membership write" ON public.department_memberships FOR ALL TO authenticated USING(public.is_super_admin(auth.uid())) WITH CHECK(public.is_super_admin(auth.uid()));
+DROP POLICY "admin grant roles" ON public.user_roles;
+DROP POLICY "admin revoke roles" ON public.user_roles;
+CREATE POLICY "super admin grant roles" ON public.user_roles FOR INSERT TO authenticated WITH CHECK(public.is_super_admin(auth.uid()));
+CREATE POLICY "super admin revoke roles" ON public.user_roles FOR DELETE TO authenticated USING(public.is_super_admin(auth.uid()) AND user_id<>auth.uid());
+CREATE OR REPLACE FUNCTION public.set_department_access(_target uuid, _department uuid, _role text) RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$ BEGIN
+IF NOT public.is_super_admin(auth.uid()) THEN RAISE EXCEPTION 'Only the super admin can grant permissions'; END IF;
+IF _role NOT IN ('manager','teacher','none') THEN RAISE EXCEPTION 'Invalid department role'; END IF;
+IF _role='none' THEN DELETE FROM public.department_memberships WHERE user_id=_target AND department_id=_department;
+ELSE INSERT INTO public.department_memberships(user_id,department_id,role) VALUES(_target,_department,_role) ON CONFLICT(user_id) DO UPDATE SET department_id=EXCLUDED.department_id,role=EXCLUDED.role,can_take=false,can_edit=false; END IF; END $$;
+CREATE OR REPLACE FUNCTION public.add_department_teacher(_email text, _department uuid) RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$ DECLARE target uuid; BEGIN
+IF NOT public.is_super_admin(auth.uid()) THEN RAISE EXCEPTION 'Only the super admin can grant permissions'; END IF;
+SELECT id INTO target FROM public.profiles WHERE lower(email)=lower(trim(_email));
+IF target IS NULL THEN RAISE EXCEPTION 'An existing registered staff account is required'; END IF;
+PERFORM public.set_department_access(target,_department,'teacher'); END $$;
+CREATE OR REPLACE FUNCTION public.set_school_role(_target uuid, _role text) RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$ BEGIN
+IF NOT public.is_super_admin(auth.uid()) OR _target=auth.uid() THEN RAISE EXCEPTION 'Super admin required; your own role cannot be changed'; END IF;
+IF _role NOT IN ('admin','teacher','none') THEN RAISE EXCEPTION 'Invalid role'; END IF;
+DELETE FROM public.user_roles WHERE user_id=_target;
+IF _role<>'none' THEN INSERT INTO public.user_roles(user_id,role) VALUES(_target,_role::public.app_role); ELSE DELETE FROM public.department_memberships WHERE user_id=_target; END IF; END $$;
+CREATE OR REPLACE FUNCTION public.can_record_attendance(_user uuid, _class uuid, _date date) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public AS $$ SELECT _date<=CURRENT_DATE AND (public.is_super_admin(_user) OR EXISTS(SELECT 1 FROM public.classes c JOIN public.departments d ON d.id=c.department_id JOIN public.department_memberships m ON m.department_id=d.id WHERE c.id=_class AND m.user_id=_user AND m.can_take AND CASE WHEN m.role='manager' THEN CASE WHEN _date=CURRENT_DATE THEN d.manager_record_today ELSE d.manager_correct_past END ELSE CASE WHEN _date=CURRENT_DATE THEN d.teacher_record_today ELSE d.teacher_correct_past END END)) $$;
+CREATE FUNCTION public.can_edit_attendance(_user uuid, _class uuid, _date date) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public AS $$ SELECT _date<=CURRENT_DATE AND (public.is_super_admin(_user) OR EXISTS(SELECT 1 FROM public.classes c JOIN public.departments d ON d.id=c.department_id JOIN public.department_memberships m ON m.department_id=d.id WHERE c.id=_class AND m.user_id=_user AND m.can_edit AND CASE WHEN m.role='manager' THEN CASE WHEN _date=CURRENT_DATE THEN d.manager_edit_today ELSE d.manager_correct_past END ELSE CASE WHEN _date=CURRENT_DATE THEN d.teacher_edit_today ELSE d.teacher_correct_past END END)) $$;
+REVOKE ALL ON FUNCTION public.can_edit_attendance(uuid,uuid,date) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.can_edit_attendance(uuid,uuid,date) TO authenticated,service_role;
+DROP POLICY "scoped attendance update" ON public.attendance;
+CREATE POLICY "explicit attendance edit" ON public.attendance FOR UPDATE TO authenticated USING(public.can_edit_attendance(auth.uid(),class_id,date)) WITH CHECK(public.can_edit_attendance(auth.uid(),class_id,date));
+DROP POLICY "admin delete attendance" ON public.attendance;
+CREATE POLICY "super admin delete attendance" ON public.attendance FOR DELETE TO authenticated USING(public.is_super_admin(auth.uid()));

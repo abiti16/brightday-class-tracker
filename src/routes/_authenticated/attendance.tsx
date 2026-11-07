@@ -7,14 +7,14 @@ import { QrScanner } from "@/components/QrScanner";
 import { supabase } from "@/integrations/supabase/client";
 import { classesQuery, departmentsQuery, STATUSES, today, type Status } from "@/lib/data";
 import { useMe } from "@/lib/session";
-import { canRecordAttendance } from "@/lib/department-access";
+import { canChangeSession } from "@/lib/department-access";
 import { PageHeader } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { AttendancePeriodSelect } from "@/components/AttendancePeriodSelect";
-import { ATTENDANCE_CONFLICT, attendanceRows, periodLabel, type AttendancePeriod } from "@/lib/attendance-period";
+import { attendanceRows, periodLabel, type AttendancePeriod } from "@/lib/attendance-period";
 
 export const Route = createFileRoute("/_authenticated/attendance")({
   head: () => ({ meta: [{ title: "Take attendance – Attendly" }, { name: "description", content: "Record morning and afternoon student attendance." }, { property: "og:title", content: "Take attendance – Attendly" }, { property: "og:description", content: "Record morning and afternoon student attendance." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
@@ -65,8 +65,8 @@ function AttendancePage() {
   }
 
   const selectedDepartment = classes.find((c) => c.id === classId)?.department_id;
-  const locked = !canRecordAttendance(me?.role, me?.membership, selectedDepartment, date, today(), departments.find((d) => d.id === selectedDepartment));
   const alreadySaved = data && Object.keys(data.existing).length > 0;
+  const locked = !canChangeSession(me?.isSuperAdmin === true, me?.membership, selectedDepartment, date, today(), !!alreadySaved, departments.find((d) => d.id === selectedDepartment));
   const visible = useMemo(
     () => (data?.students ?? []).filter((s) => (s.full_name + s.student_code).toLowerCase().includes(search.toLowerCase())),
     [data, search],
@@ -88,7 +88,17 @@ function AttendancePage() {
     setSaving(true);
     const rows = attendanceRows(data.students, marks, classId, date, period, me?.id ?? null);
     // Corrections update only the selected student's date and period.
-    const { error } = await supabase.from("attendance").upsert(rows, { onConflict: ATTENDANCE_CONFLICT });
+    const existing = rows.filter((r) => !!data.existing[r.student_id]);
+    const fresh = rows.filter((r) => !data.existing[r.student_id]);
+    let error: { message: string } | null = null;
+    for (const row of existing) {
+      const result = await supabase.from("attendance").update({ status: row.status, recorded_by: row.recorded_by }).eq("student_id", row.student_id).eq("date", date).eq("period", period).select("id");
+      if (result.error || !result.data.length) { error = result.error ?? { message: "Edit permission required." }; break; }
+    }
+    if (!error && fresh.length) {
+      const result = await supabase.from("attendance").insert(fresh);
+      error = result.error;
+    }
     setSaving(false);
     if (error) { toast.error(error.message.includes("row-level") ? "You are not allowed to change attendance for this date." : error.message); return; }
     toast.success(`${periodLabel(period)} attendance ${alreadySaved ? "corrected" : "saved"}`);
