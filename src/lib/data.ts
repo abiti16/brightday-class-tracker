@@ -35,7 +35,7 @@ export const gradesQuery = queryOptions({
 export const departmentsQuery = queryOptions({
   queryKey: ["departments"],
   queryFn: async () => {
-    const { data, error } = await supabase.from("departments").select("id,name").order("created_at");
+    const { data, error } = await supabase.from("departments").select("id,name,manager_record_today,manager_correct_past,teacher_record_today,teacher_correct_past").order("created_at");
     if (error) throw error;
     return data ?? [];
   },

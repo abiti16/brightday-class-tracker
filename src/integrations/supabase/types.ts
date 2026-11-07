@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_permission_review_state: {
+        Row: {
+          blocked: boolean
+          id: string
+          reason: string | null
+          status: number | null
+          updated_at: string
+        }
+        Insert: {
+          blocked?: boolean
+          id: string
+          reason?: string | null
+          status?: number | null
+          updated_at?: string
+        }
+        Update: {
+          blocked?: boolean
+          id?: string
+          reason?: string | null
+          status?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       attendance: {
         Row: {
           class_id: string | null
@@ -138,17 +162,29 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          manager_correct_past: boolean
+          manager_record_today: boolean
           name: string
+          teacher_correct_past: boolean
+          teacher_record_today: boolean
         }
         Insert: {
           created_at?: string
           id?: string
+          manager_correct_past?: boolean
+          manager_record_today?: boolean
           name: string
+          teacher_correct_past?: boolean
+          teacher_record_today?: boolean
         }
         Update: {
           created_at?: string
           id?: string
+          manager_correct_past?: boolean
+          manager_record_today?: boolean
           name?: string
+          teacher_correct_past?: boolean
+          teacher_record_today?: boolean
         }
         Relationships: []
       }

@@ -9,3 +9,9 @@
 - [ ] Add department assignment for classes and manager/teacher access controls for staff.
 - [ ] Verify manager isolation, independent periods and signed-in desktop/mobile workflows.
 - [ ] Commit verified changes.
+
+# Configurable permissions and AI review
+- [ ] Add administrator-only department attendance settings with database enforcement.
+- [ ] Add AI Gateway review of access conflicts without automatic permission changes.
+- [ ] Test permissions and verify signed-in settings, saving and AI review.
+- [ ] Commit verified changes.

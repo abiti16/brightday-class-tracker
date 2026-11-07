@@ -33,3 +33,5 @@ use the editor.
 - Attendance uniqueness is enforced by `(student_id, date, period)` and saves use upsert, so corrections never overwrite a different session.
 - Shared attendance-period definitions and row construction live in a browser-safe library; attendance views select a period and aggregate recorded sessions consistently.
 - Departments are assigned at class level; separate department memberships grant manager or teacher access, while school administrators remain global. RLS scopes every student, class, attendance and report read; guarded database functions manage staff atomically and prevent managers escalating privileges.
+- Department attendance settings are enforced by the shared date/role helper and database permission function for both periods; only school administrators may save settings.
+- AI permission reviews authenticate administrators server-side, stream through AI Gateway, send only saved settings and aggregate counts, and never execute permission changes; terminal access blocks persist until explicit administrator recovery.

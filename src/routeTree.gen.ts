@@ -20,6 +20,7 @@ import { Route as AuthenticatedIdCardsRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
 import { Route as AuthenticatedStaffRouteImport } from './routes/_authenticated/staff'
 import { Route as AuthenticatedStudentsRouteImport } from './routes/_authenticated/students'
+import { Route as ApiPublicPermissionReviewRouteImport } from './routes/api/public/permission-review'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -75,6 +76,12 @@ const AuthenticatedStudentsRoute = AuthenticatedStudentsRouteImport.update({
   path: '/students',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiPublicPermissionReviewRoute =
+  ApiPublicPermissionReviewRouteImport.update({
+    id: '/api/public/permission-review',
+    path: '/api/public/permission-review',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -87,6 +94,7 @@ export interface FileRoutesByFullPath {
   '/reports': typeof AuthenticatedReportsRoute
   '/staff': typeof AuthenticatedStaffRoute
   '/students': typeof AuthenticatedStudentsRoute
+  '/api/public/permission-review': typeof ApiPublicPermissionReviewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -99,6 +107,7 @@ export interface FileRoutesByTo {
   '/reports': typeof AuthenticatedReportsRoute
   '/staff': typeof AuthenticatedStaffRoute
   '/students': typeof AuthenticatedStudentsRoute
+  '/api/public/permission-review': typeof ApiPublicPermissionReviewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -113,6 +122,7 @@ export interface FileRoutesById {
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/staff': typeof AuthenticatedStaffRoute
   '/_authenticated/students': typeof AuthenticatedStudentsRoute
+  '/api/public/permission-review': typeof ApiPublicPermissionReviewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -127,6 +137,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/staff'
     | '/students'
+    | '/api/public/permission-review'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -139,6 +150,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/staff'
     | '/students'
+    | '/api/public/permission-review'
   id:
     | '__root__'
     | '/'
@@ -152,6 +164,7 @@ export interface FileRouteTypes {
     | '/_authenticated/reports'
     | '/_authenticated/staff'
     | '/_authenticated/students'
+    | '/api/public/permission-review'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -159,6 +172,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  ApiPublicPermissionReviewRoute: typeof ApiPublicPermissionReviewRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -240,6 +254,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedStudentsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/permission-review': {
+      id: '/api/public/permission-review'
+      path: '/api/public/permission-review'
+      fullPath: '/api/public/permission-review'
+      preLoaderRoute: typeof ApiPublicPermissionReviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -271,6 +292,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  ApiPublicPermissionReviewRoute: ApiPublicPermissionReviewRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

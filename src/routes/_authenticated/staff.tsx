@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DepartmentPermissions } from "@/components/DepartmentPermissions";
 
 export const Route = createFileRoute("/_authenticated/staff")({
   head: () => ({ meta: [{ title: "Staff & roles – Attendly" }, { name: "description", content: "Manage staff access." }, { property: "og:title", content: "Staff & roles – Attendly" }, { property: "og:description", content: "Manage staff access." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
@@ -59,6 +60,7 @@ function Staff() {
 
   return <div className="mx-auto max-w-6xl">
     <PageHeader title="Staff & roles" description={admin ? "School administration" : me?.membership?.name ?? "Department staff"} />
+    {admin && <DepartmentPermissions />}
     {admin && <section className="mb-8 border-b pb-6">
       <h2 className="mb-3 text-lg font-bold">Departments</h2>
       <div className="grid gap-4 sm:grid-cols-2">{departments.map((d) => <form key={d.id} className="flex gap-2" onSubmit={(e) => {
