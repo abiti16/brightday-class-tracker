@@ -5,20 +5,20 @@ import { toast } from "sonner";
 import { QrCode, Search } from "lucide-react";
 import { QrScanner } from "@/components/QrScanner";
 import { supabase } from "@/integrations/supabase/client";
-import { classesQuery, departmentsQuery, STATUSES, today, type Status } from "@/lib/data";
+import { classesQuery, STATUSES, today, type Status } from "@/lib/data";
 import { useMe } from "@/lib/session";
-import { canChangeSession } from "@/lib/department-access";
+import { canRecordAttendance } from "@/lib/department-access";
 import { PageHeader } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { AttendancePeriodSelect } from "@/components/AttendancePeriodSelect";
-import { attendanceRows, periodLabel, type AttendancePeriod } from "@/lib/attendance-period";
+import { ATTENDANCE_CONFLICT, attendanceRows, periodLabel, type AttendancePeriod } from "@/lib/attendance-period";
 
 export const Route = createFileRoute("/_authenticated/attendance")({
   head: () => ({ meta: [{ title: "Take attendance – Attendly" }, { name: "description", content: "Record morning and afternoon student attendance." }, { property: "og:title", content: "Take attendance – Attendly" }, { property: "og:description", content: "Record morning and afternoon student attendance." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
-  loader: async ({ context }) => { await Promise.all([context.queryClient.ensureQueryData(classesQuery), context.queryClient.ensureQueryData(departmentsQuery)]); },
+  loader: ({ context }) => context.queryClient.ensureQueryData(classesQuery),
   component: AttendancePage,
 });
 
@@ -32,7 +32,6 @@ function AttendancePage() {
   const me = useMe();
   const isAdmin = me?.role === "admin";
   const { data: classes } = useSuspenseQuery(classesQuery);
-  const { data: departments } = useSuspenseQuery(departmentsQuery);
   const [date, setDate] = useState(today());
   const [classId, setClassId] = useState(classes[0]?.id ?? "");
   const [period, setPeriod] = useState<AttendancePeriod>("morning");
@@ -64,9 +63,8 @@ function AttendancePage() {
     });
   }
 
-  const selectedDepartment = classes.find((c) => c.id === classId)?.department_id;
+  const locked = !canRecordAttendance(me?.role, me?.membership, classes.find((c) => c.id === classId)?.department_id, date, today());
   const alreadySaved = data && Object.keys(data.existing).length > 0;
-  const locked = !canChangeSession(me?.isSuperAdmin === true, me?.membership, selectedDepartment, date, today(), !!alreadySaved, departments.find((d) => d.id === selectedDepartment));
   const visible = useMemo(
     () => (data?.students ?? []).filter((s) => (s.full_name + s.student_code).toLowerCase().includes(search.toLowerCase())),
     [data, search],
@@ -88,17 +86,7 @@ function AttendancePage() {
     setSaving(true);
     const rows = attendanceRows(data.students, marks, classId, date, period, me?.id ?? null);
     // Corrections update only the selected student's date and period.
-    const existing = rows.filter((r) => !!data.existing[r.student_id]);
-    const fresh = rows.filter((r) => !data.existing[r.student_id]);
-    let error: { message: string } | null = null;
-    for (const row of existing) {
-      const result = await supabase.from("attendance").update({ status: row.status, recorded_by: row.recorded_by }).eq("student_id", row.student_id).eq("date", date).eq("period", period).select("id");
-      if (result.error || !result.data.length) { error = result.error ?? { message: "Edit permission required." }; break; }
-    }
-    if (!error && fresh.length) {
-      const result = await supabase.from("attendance").insert(fresh);
-      error = result.error;
-    }
+    const { error } = await supabase.from("attendance").upsert(rows, { onConflict: ATTENDANCE_CONFLICT });
     setSaving(false);
     if (error) { toast.error(error.message.includes("row-level") ? "You are not allowed to change attendance for this date." : error.message); return; }
     toast.success(`${periodLabel(period)} attendance ${alreadySaved ? "corrected" : "saved"}`);
@@ -153,7 +141,7 @@ function AttendancePage() {
           <div className="mx-auto max-w-sm"><QrScanner onScan={handleScan} /></div>
         </div>
       )}
-      {locked && <p className="mb-3 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">View only — your department permissions do not allow changes for this date.</p>}
+      {locked && <p className="mb-3 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">View only — past corrections require your department manager or a school administrator.</p>}
       {alreadySaved && !locked && <p className="mb-3 rounded-md bg-accent px-3 py-2 text-sm text-accent-foreground">Attendance already recorded for this date. Saving will update the existing records.</p>}
 
       <div className="overflow-hidden rounded-xl border bg-card shadow-card">
