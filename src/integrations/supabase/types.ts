@@ -357,6 +357,10 @@ export type Database = {
         Args: { _department: string; _user: string }
         Returns: boolean
       }
+      set_attendance_grants: {
+        Args: { _edit: boolean; _take: boolean; _target: string }
+        Returns: undefined
+      }
       set_department_access: {
         Args: { _department: string; _role: string; _target: string }
         Returns: undefined

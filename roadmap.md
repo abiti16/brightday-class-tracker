@@ -5,7 +5,13 @@
 - [x] Commit verified changes.
 
 # Department privileges
-- [ ] Add two editable departments and enforce department-scoped attendance, student and report access.
-- [ ] Add department assignment for classes and manager/teacher access controls for staff.
-- [ ] Verify manager isolation, independent periods and signed-in desktop/mobile workflows.
-- [ ] Commit verified changes.
+- [x] Add two editable departments and enforce department-scoped attendance, student and report access.
+- [x] Add department assignment for classes and manager/teacher access controls for staff.
+- [x] Verify manager isolation, independent periods and signed-in desktop/mobile workflows.
+- [x] Commit verified changes.
+
+# Super-admin permissions and AI
+- [x] Add department CRUD and explicit take/edit grants controlled only by the super admin.
+- [x] Enforce saved-session corrections separately from initial attendance recording.
+- [x] Add AI Gateway conflict review of saved permissions with no automatic grants.
+- [x] Verify signed-in CRUD, permissions, AI output and tests; commit changes.

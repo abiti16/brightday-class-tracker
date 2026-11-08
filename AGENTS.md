@@ -30,6 +30,8 @@ use the editor.
 <!-- LOVABLE:END -->
 
 - Staff pages live under `src/routes/_authenticated/` and query the database from the browser client; access control is enforced by RLS (`has_role`/`is_staff`), so every new table needs matching role-based policies.
-- Attendance uniqueness is enforced by `(student_id, date, period)` and saves use upsert, so corrections never overwrite a different session.
+- Attendance uniqueness is enforced by `(student_id, date, period)`; initial saves insert and saved-session corrections update only that session to honor separate take/edit grants.
 - Shared attendance-period definitions and row construction live in a browser-safe library; attendance views select a period and aggregate recorded sessions consistently.
 - Departments are assigned at class level; separate department memberships grant manager or teacher access, while school administrators remain global. RLS scopes every student, class, attendance and report read; guarded database functions manage staff atomically and prevent managers escalating privileges.
+- Only the database-backed super admin grants staff access and edits department rules; non-super-admin attendance requires explicit take/edit grants and matching department/date rules.
+- AI reviews authenticate the super admin server-side, stream saved settings and anonymous staff counts through AI Gateway, never write permissions, and persist terminal access blocks until explicit recovery.

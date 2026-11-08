@@ -1,28 +1,13 @@
-import { describe, expect, it } from "vitest";
-import { canRecordAttendance } from "@/lib/department-access";
-
-describe("department attendance privileges", () => {
-  const now = "2026-11-06";
-  it("managers can correct their department's past attendance", () => {
-    expect(canRecordAttendance("manager", { department_id: "course", role: "manager" }, "course", "2026-11-05", now)).toBe(true);
-  });
-  it("managers cannot record another department's attendance", () => {
-    expect(canRecordAttendance("manager", { department_id: "course", role: "manager" }, "other", now, now)).toBe(false);
-  });
-  it("teachers can record today only in their department", () => {
-    const membership = { department_id: "course", role: "teacher" as const };
-    expect(canRecordAttendance("teacher", membership, "course", now, now)).toBe(true);
-    expect(canRecordAttendance("teacher", membership, "course", "2026-11-05", now)).toBe(false);
-    expect(canRecordAttendance("teacher", membership, "other", now, now)).toBe(false);
-  });
-  it("unassigned teachers cannot record attendance", () => {
-    expect(canRecordAttendance("teacher", null, "course", now, now)).toBe(false);
-  });
-  it("school administrators retain both departments", () => {
-    expect(canRecordAttendance("admin", null, "course", now, now)).toBe(true);
-    expect(canRecordAttendance("admin", null, "other", "2026-11-05", now)).toBe(true);
-  });
-  it("future attendance remains blocked", () => {
-    expect(canRecordAttendance("admin", null, "course", "2026-11-07", now)).toBe(false);
-  });
+import {describe,it,expect} from "vitest";
+import {hasAttendancePermission,DEFAULT_PERMISSIONS} from "@/lib/department-access";
+describe("explicit super-admin-controlled attendance grants",()=>{
+ const date="2026-11-08";const member={department_id:"course",role:"teacher" as const,can_take:true,can_edit:false};
+ it("take grant allows initial attendance",()=>expect(hasAttendancePermission(false,member,"course",date,date,false)).toBe(true));
+ it("take grant alone cannot edit saved attendance",()=>expect(hasAttendancePermission(false,member,"course",date,date,true)).toBe(false));
+ it("editing requires both grant and department rule",()=>{expect(hasAttendancePermission(false,{...member,can_edit:true},"course",date,date,true)).toBe(false);expect(hasAttendancePermission(false,{...member,can_edit:true},"course",date,date,true,{...DEFAULT_PERMISSIONS,teacher_edit_today:true})).toBe(true);});
+ it("ungranted staff cannot record",()=>expect(hasAttendancePermission(false,{...member,can_take:false},"course",date,date,false)).toBe(false));
+ it("cross-department access is blocked",()=>expect(hasAttendancePermission(false,member,"other",date,date,false)).toBe(false));
+ it("super admin retains non-future access",()=>expect(hasAttendancePermission(true,null,"other","2026-11-07",date,true)).toBe(true));
+ it("future dates remain blocked for super admin",()=>expect(hasAttendancePermission(true,null,"course","2026-11-09",date,false)).toBe(false));
+ it("past corrections need explicit manager edit grant",()=>{const manager={...member,role:"manager" as const};expect(hasAttendancePermission(false,manager,"course","2026-11-07",date,true)).toBe(false);expect(hasAttendancePermission(false,{...manager,can_edit:true},"course","2026-11-07",date,true)).toBe(true);});
 });
