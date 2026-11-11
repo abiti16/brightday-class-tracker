@@ -15,3 +15,6 @@
 - [x] Enforce saved-session corrections separately from initial attendance recording.
 - [x] Add AI Gateway conflict review of saved permissions with no automatic grants.
 - [x] Verify signed-in CRUD, permissions, AI output and tests; commit changes.
+# Staff & roles saving
+- [x] Verify department CRUD, permission rules and staff grants save and persist for the super admin.
+- [x] Keep attendance grants when only a staff member's department role changes.

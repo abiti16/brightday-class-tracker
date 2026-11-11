@@ -29,6 +29,13 @@
       "when": 1794116989832,
       "tag": "0003_super_admin_permission_controls",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794413223779,
+      "tag": "0004_keep_grants_on_role_change",
+      "breakpoints": true
     }
   ]
 }
