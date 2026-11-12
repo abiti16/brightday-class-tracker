@@ -31,7 +31,7 @@ export function sessionOptions(all: AttendanceSession[], departments: { id: stri
   return [...byKey.entries()]
     .map(([key, list]) => {
       const named = list.filter((s) => s.department_id);
-      const first = named[0] ?? list[0];
+      const first: AttendanceSession = named[0] ?? list[0] ?? { key, name: key, start_time: null, department_id: null };
       const label = named.length === 1 && deptName(first.department_id) ? `${sessionText(first)} (${deptName(first.department_id)})` : sessionText(first);
       return { value: key, label, time: first.start_time ?? "" };
     })

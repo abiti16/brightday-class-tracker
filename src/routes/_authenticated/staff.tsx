@@ -4,18 +4,19 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useMe } from "@/lib/session";
-import { departmentsQuery, nameSchema } from "@/lib/data";
+import { departmentsQuery, nameSchema, sessionsQuery } from "@/lib/data";
 import { PageHeader } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DepartmentPermissions } from "@/components/DepartmentPermissions";
+import { DepartmentSessions } from "@/components/DepartmentSessions";
 import { Trash2, Plus, Save } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/staff")({
   head: () => ({ meta: [{ title: "Staff permissions – Attendly" }, { name: "description", content: "Super-admin department settings, staff grants and AI access review." }, { property: "og:title", content: "Staff permissions – Attendly" }, { property: "og:description", content: "Manage department attendance access safely." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
-  loader: ({ context }) => context.queryClient.ensureQueryData(departmentsQuery), component: Staff,
+  loader: ({ context }) => Promise.all([context.queryClient.ensureQueryData(departmentsQuery), context.queryClient.ensureQueryData(sessionsQuery)]), component: Staff,
 });
 function Staff() {
   const me = useMe(); const owner = me?.isSuperAdmin === true;
@@ -37,7 +38,7 @@ function Staff() {
     <section className="mb-6 border-b pb-6"><h2 className="mb-3 text-lg font-bold">Departments</h2>
       <form className="mb-4 flex gap-2" onSubmit={(e) => {e.preventDefault(); const parsed=nameSchema.safeParse(name); if(!parsed.success) {toast.error("Enter a department name (1–50 characters)."); return;} void apply(() => supabase.from("departments").insert({name:parsed.data}));}}><Input aria-label="New department name" value={name} onChange={(e)=>setName(e.target.value)} /><Button disabled={busy}><Plus/>Add department</Button></form>
       {departments.map((d)=><form key={d.id} className="mb-3 flex flex-wrap gap-2" onSubmit={(e)=>{e.preventDefault(); const parsed=nameSchema.safeParse(names[d.id]??d.name); if(!parsed.success){toast.error("Invalid department name.");return;} void apply(()=>supabase.from("departments").update({name:parsed.data}).eq("id",d.id));}}><Input className="min-w-0 flex-1" aria-label={`Department name ${d.name}`} value={names[d.id]??d.name} onChange={(e)=>setNames({...names,[d.id]:e.target.value})}/><Button disabled={busy}><Save/>Save name</Button><Button type="button" variant="outline" aria-label={`Delete ${d.name}`} disabled={busy} onClick={()=>{if(window.confirm(`Delete ${d.name}? Move its classes and remove staff assignments first.`)) void apply(()=>supabase.from("departments").delete().eq("id",d.id));}}><Trash2/></Button></form>)}
-    </section><DepartmentPermissions/>
+    </section><DepartmentSessions/><DepartmentPermissions/>
     <form className="mb-6 flex flex-wrap gap-3" onSubmit={(e)=>{e.preventDefault(); if(!department){toast.error("Select a department.");return;} void apply(()=>supabase.rpc("add_department_teacher",{_email:email,_department:department}));}}><Input className="min-w-0 flex-1" aria-label="Registered staff email" type="email" required value={email} onChange={(e)=>setEmail(e.target.value)}/><Select value={department} onValueChange={setDepartment}><SelectTrigger className="w-48"><SelectValue placeholder="Department"/></SelectTrigger><SelectContent>{departments.map((d)=><SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent></Select><Button disabled={busy}>Assign staff</Button></form>
     {error && <p role="alert" className="text-destructive">{error.message}</p>}
     <div className="space-y-4">{staff.map((u)=>{const m=u.membership; return <div key={u.id} className="rounded-lg border bg-card p-4"><div className="mb-3 font-semibold">{u.full_name || u.email}{u.id===me?.id && " (you)"}</div><div className="flex flex-wrap items-center gap-4">

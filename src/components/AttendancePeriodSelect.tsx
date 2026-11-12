@@ -6,7 +6,7 @@ export function AttendancePeriodSelect({ value, onChange, options }: { value: At
   return (
     <div>
       <label className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground"><Clock className="size-3.5" />Session</label>
-      <Select value={options.some((o) => o.value === value) ? value : undefined} onValueChange={onChange}>
+      <Select value={options.some((o) => o.value === value) ? value : ""} onValueChange={onChange}>
         <SelectTrigger aria-label="Attendance session"><SelectValue placeholder="Select session" /></SelectTrigger>
         <SelectContent>
           {options.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
