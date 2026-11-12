@@ -1,14 +1,17 @@
-import { Sun, Sunrise } from "lucide-react";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { type AttendancePeriod } from "@/lib/attendance-period";
+import { Clock } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { AttendancePeriod, SessionOption } from "@/lib/attendance-period";
 
-export function AttendancePeriodSelect({ value, onChange }: { value: AttendancePeriod; onChange: (value: AttendancePeriod) => void }) {
+export function AttendancePeriodSelect({ value, onChange, options }: { value: AttendancePeriod; onChange: (value: AttendancePeriod) => void; options: SessionOption[] }) {
   return (
-    <Tabs value={value} onValueChange={(next) => { if (next === "morning" || next === "afternoon") onChange(next); }}>
-      <TabsList aria-label="Attendance period" className="w-full">
-        <TabsTrigger value="morning" className="flex-1 gap-2"><Sunrise className="size-4" />Morning</TabsTrigger>
-        <TabsTrigger value="afternoon" className="flex-1 gap-2"><Sun className="size-4" />Afternoon</TabsTrigger>
-      </TabsList>
-    </Tabs>
+    <div>
+      <label className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground"><Clock className="size-3.5" />Session</label>
+      <Select value={options.some((o) => o.value === value) ? value : undefined} onValueChange={onChange}>
+        <SelectTrigger aria-label="Attendance session"><SelectValue placeholder="Select session" /></SelectTrigger>
+        <SelectContent>
+          {options.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+        </SelectContent>
+      </Select>
+    </div>
   );
 }

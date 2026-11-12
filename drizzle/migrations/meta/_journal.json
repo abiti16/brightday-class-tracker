@@ -36,6 +36,13 @@
       "when": 1794413223779,
       "tag": "0004_keep_grants_on_role_change",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794475199306,
+      "tag": "0005_approvals_student_accounts_department_sessions",
+      "breakpoints": true
     }
   ]
 }

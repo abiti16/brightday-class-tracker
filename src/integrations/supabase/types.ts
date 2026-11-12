@@ -86,6 +86,47 @@ export type Database = {
           },
         ]
       }
+      attendance_sessions: {
+        Row: {
+          active: boolean
+          created_at: string
+          department_id: string
+          id: string
+          key: string
+          name: string
+          sort_order: number
+          start_time: string | null
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          department_id: string
+          id?: string
+          key?: string
+          name: string
+          sort_order?: number
+          start_time?: string | null
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          department_id?: string
+          id?: string
+          key?: string
+          name?: string
+          sort_order?: number
+          start_time?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_sessions_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       classes: {
         Row: {
           created_at: string
@@ -239,6 +280,68 @@ export type Database = {
         }
         Relationships: []
       }
+      registration_reviews: {
+        Row: {
+          reviewed_at: string
+          reviewed_by: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          reviewed_at?: string
+          reviewed_by?: string | null
+          status: string
+          user_id: string
+        }
+        Update: {
+          reviewed_at?: string
+          reviewed_by?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "registration_reviews_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_accounts: {
+        Row: {
+          created_at: string
+          student_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          student_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          student_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_accounts_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: true
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_accounts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       students: {
         Row: {
           class_id: string | null
@@ -324,6 +427,10 @@ export type Database = {
         Args: { _department: string; _email: string }
         Returns: undefined
       }
+      assign_account_role: {
+        Args: { _role: string; _student?: string; _target: string }
+        Returns: undefined
+      }
       can_access_class: {
         Args: { _class: string; _user: string }
         Returns: boolean
@@ -344,11 +451,20 @@ export type Database = {
         Args: { _class: string; _date: string; _user: string }
         Returns: boolean
       }
+      decline_registration: { Args: { _target: string }; Returns: undefined }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      is_own_student: {
+        Args: { _student: string; _user: string }
+        Returns: boolean
+      }
+      is_own_student_class: {
+        Args: { _class: string; _user: string }
         Returns: boolean
       }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
@@ -368,6 +484,14 @@ export type Database = {
       set_school_role: {
         Args: { _role: string; _target: string }
         Returns: undefined
+      }
+      student_attendance_days: {
+        Args: never
+        Returns: {
+          days_attended: number
+          days_recorded: number
+          student_id: string
+        }[]
       }
     }
     Enums: {

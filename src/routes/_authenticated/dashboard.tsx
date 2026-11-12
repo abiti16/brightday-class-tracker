@@ -3,21 +3,21 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { format, subDays } from "date-fns";
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, XAxis, YAxis } from "recharts";
 import { CheckCircle2, Clock, GraduationCap, Percent, Users, XCircle } from "lucide-react";
-import { attendanceRangeQuery, classesQuery, studentsQuery, summarize, today } from "@/lib/data";
+import { attendanceRangeQuery, classesQuery, departmentsQuery, sessionsQuery, studentsQuery, summarize, today } from "@/lib/data";
 import { PageHeader } from "@/components/StatusBadge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { AttendancePeriodSelect } from "@/components/AttendancePeriodSelect";
-import type { AttendancePeriod } from "@/lib/attendance-period";
+import { sessionOptions, type AttendancePeriod } from "@/lib/attendance-period";
 
 const from = () => format(subDays(new Date(), 13), "yyyy-MM-dd");
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
-  head: () => ({ meta: [{ title: "Dashboard – Attendly" }, { name: "description", content: "Morning and afternoon attendance overview." }, { property: "og:title", content: "Dashboard – Attendly" }, { property: "og:description", content: "Morning and afternoon attendance overview." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
+  head: () => ({ meta: [{ title: "Dashboard – Attendly" }, { name: "description", content: "Department session attendance overview." }, { property: "og:title", content: "Dashboard – Attendly" }, { property: "og:description", content: "Department session attendance overview." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
   loader: ({ context: { queryClient: q } }) =>
-    Promise.all([q.ensureQueryData(studentsQuery), q.ensureQueryData(classesQuery), q.ensureQueryData(attendanceRangeQuery(from(), today()))]),
+    Promise.all([q.ensureQueryData(studentsQuery), q.ensureQueryData(classesQuery), q.ensureQueryData(attendanceRangeQuery(from(), today())), q.ensureQueryData(sessionsQuery), q.ensureQueryData(departmentsQuery)]),
   component: Dashboard,
 });
 
@@ -31,7 +31,12 @@ function Dashboard() {
   const { data: students } = useSuspenseQuery(studentsQuery);
   const { data: classes } = useSuspenseQuery(classesQuery);
   const { data: allRows } = useSuspenseQuery(attendanceRangeQuery(from(), today()));
-  const [session, setSession] = useState<AttendancePeriod>("morning");
+  const { data: allSessions } = useSuspenseQuery(sessionsQuery);
+  const { data: departments } = useSuspenseQuery(departmentsQuery);
+  const options = sessionOptions(allSessions, departments);
+  const [chosen, setSession] = useState<AttendancePeriod>("");
+  const session = options.some((o) => o.value === chosen) ? chosen : options[0]?.value ?? "";
+  const sessionName = options.find((o) => o.value === session)?.label ?? "session";
   const rows = allRows.filter((r) => r.period === session);
   const t = today();
   const todayRows = rows.filter((r) => r.date === t);
@@ -70,10 +75,10 @@ function Dashboard() {
           <Link to="/attendance">Take attendance</Link>
         </Button>
       </PageHeader>
-      <div className="mb-4 max-w-sm"><AttendancePeriodSelect value={session} onChange={setSession} /></div>
+      <div className="mb-4 max-w-sm"><AttendancePeriodSelect value={session} onChange={setSession} options={options} /></div>
       {unmarked > 0 && (
         <div className="mb-6 rounded-lg border border-primary/20 bg-accent px-4 py-3 text-sm text-accent-foreground">
-          {todayRows.length === 0 ? `No ${session} attendance recorded yet today.` : `${unmarked} students have not been marked this ${session}.`}
+          {todayRows.length === 0 ? `No ${sessionName} attendance recorded yet today.` : `${unmarked} students have not been marked for ${sessionName}.`}
         </div>
       )}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">

@@ -18,3 +18,10 @@
 # Staff & roles saving
 - [x] Verify department CRUD, permission rules and staff grants save and persist for the super admin.
 - [x] Keep attendance grants when only a staff member's department role changes.
+# Approvals, student accounts and department sessions
+- [ ] Save unmarked (unscanned) students as absent when attendance is saved.
+- [ ] Registration requests: super admin approves new accounts as student/teacher/admin or declines them.
+- [ ] Student role linked to a student record; students see only their own attendance; can be promoted to teacher.
+- [ ] Department-named attendance sessions (name + time) managed by the super admin, used on attendance, dashboard and reports.
+- [ ] Students page: filter by number of days attended.
+- [ ] Verify signed-in, run tests, commit.

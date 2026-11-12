@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { QrCode, Search } from "lucide-react";
 import { QrScanner } from "@/components/QrScanner";
 import { supabase } from "@/integrations/supabase/client";
-import { classesQuery, departmentsQuery, STATUSES, today, type Status } from "@/lib/data";
+import { classesQuery, departmentsQuery, sessionsQuery, STATUSES, today, type Status } from "@/lib/data";
 import { useMe } from "@/lib/session";
 import { hasAttendancePermission } from "@/lib/department-access";
 import { PageHeader } from "@/components/StatusBadge";
@@ -14,11 +14,11 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { AttendancePeriodSelect } from "@/components/AttendancePeriodSelect";
-import { ATTENDANCE_CONFLICT, attendanceRows, periodLabel, type AttendancePeriod } from "@/lib/attendance-period";
+import { attendanceRows, periodLabel, sessionsForDepartment, sessionText, unmarkedStudents, type AttendancePeriod } from "@/lib/attendance-period";
 
 export const Route = createFileRoute("/_authenticated/attendance")({
-  head: () => ({ meta: [{ title: "Take attendance – Attendly" }, { name: "description", content: "Record morning and afternoon student attendance." }, { property: "og:title", content: "Take attendance – Attendly" }, { property: "og:description", content: "Record morning and afternoon student attendance." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
-  loader: async ({ context }) => { await Promise.all([context.queryClient.ensureQueryData(classesQuery), context.queryClient.ensureQueryData(departmentsQuery)]); },
+  head: () => ({ meta: [{ title: "Take attendance – Attendly" }, { name: "description", content: "Record student attendance for each department session." }, { property: "og:title", content: "Take attendance – Attendly" }, { property: "og:description", content: "Record student attendance for each department session." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
+  loader: async ({ context }) => { await Promise.all([context.queryClient.ensureQueryData(classesQuery), context.queryClient.ensureQueryData(departmentsQuery), context.queryClient.ensureQueryData(sessionsQuery)]); },
   component: AttendancePage,
 });
 
@@ -35,7 +35,12 @@ function AttendancePage() {
   const { data: departments } = useSuspenseQuery(departmentsQuery);
   const [date, setDate] = useState(today());
   const [classId, setClassId] = useState(classes[0]?.id ?? "");
-  const [period, setPeriod] = useState<AttendancePeriod>("morning");
+  const { data: allSessions } = useSuspenseQuery(sessionsQuery);
+  const departmentId = classes.find((c) => c.id === classId)?.department_id;
+  const sessions = sessionsForDepartment(allSessions, departmentId);
+  const [chosenPeriod, setPeriod] = useState<AttendancePeriod>("");
+  const period = sessions.some((s) => s.key === chosenPeriod) ? chosenPeriod : sessions[0]?.key ?? "";
+  const sessionName = periodLabel(period, allSessions, departmentId);
   const [draft, setDraft] = useState<{ scope: string; values: Record<string, Status> }>({ scope: "", values: {} });
   const scope = `${classId}:${date}:${period}`;
   const [search, setSearch] = useState("");
@@ -45,7 +50,7 @@ function AttendancePage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["roll", classId, date, period],
-    enabled: !!classId,
+    enabled: !!classId && !!period,
     queryFn: async () => {
       const [{ data: st, error: e1 }, { data: att, error: e2 }] = await Promise.all([
         supabase.from("students").select("id,student_code,full_name,gender").eq("class_id", classId).order("full_name"),
@@ -65,7 +70,6 @@ function AttendancePage() {
   }
 
   const alreadySaved = data && Object.keys(data.existing).length > 0;
-  const departmentId = classes.find((c) => c.id === classId)?.department_id;
   const locked = !hasAttendancePermission(me?.isSuperAdmin === true, me?.membership, departmentId, date, today(), !!alreadySaved, departments.find((d) => d.id === departmentId));
   const visible = useMemo(
     () => (data?.students ?? []).filter((s) => (s.full_name + s.student_code).toLowerCase().includes(search.toLowerCase())),
@@ -82,8 +86,7 @@ function AttendancePage() {
 
   async function save() {
     if (!data || locked || saving) return;
-    const missing = data.students.filter((s) => !marks[s.id]);
-    if (missing.length) { toast.error(`Mark all students first (${missing.length} remaining).`); return; }
+    const missing = unmarkedStudents(data.students, marks);
     if (date > today()) { toast.error("You cannot record attendance for a future date."); return; }
     setSaving(true);
     const rows = attendanceRows(data.students, marks, classId, date, period, me?.id ?? null);
@@ -98,7 +101,7 @@ function AttendancePage() {
     }
     setSaving(false);
     if (error) { toast.error(error.message.includes("row-level") ? "You are not allowed to change attendance for this date." : error.message); return; }
-    toast.success(`${periodLabel(period)} attendance ${alreadySaved ? "corrected" : "saved"}`);
+    toast.success(`${sessionName} attendance ${alreadySaved ? "corrected" : "saved"}${missing.length ? ` · ${missing.length} not scanned marked absent` : ""}`);
     setDraft({ scope: "", values: {} });
     qc.invalidateQueries({ queryKey: ["roll"] });
     qc.invalidateQueries({ queryKey: ["attendance"] });
@@ -107,7 +110,9 @@ function AttendancePage() {
   return (
     <div className="mx-auto max-w-5xl">
       <PageHeader title="Take attendance" description={me?.membership?.name ?? (isAdmin ? "All departments" : "Attendance")} />
-      <div className="mb-4 max-w-sm"><AttendancePeriodSelect value={period} onChange={setPeriod} /></div>
+      <div className="mb-4 max-w-sm">
+        {sessions.length ? <AttendancePeriodSelect value={period} onChange={setPeriod} options={sessions.map((s) => ({ value: s.key, label: sessionText(s) }))} /> : <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">This department has no sessions yet. The super admin can add them on Staff &amp; roles.</p>}
+      </div>
       <div className="mb-4 grid gap-3 rounded-xl border bg-card p-4 shadow-card sm:grid-cols-3">
         <div>
           <label className="mb-1 block text-xs font-semibold text-muted-foreground">Date</label>
@@ -189,9 +194,12 @@ function AttendancePage() {
           </ul>
         )}
       </div>
+      {!locked && data && unmarkedStudents(data.students, marks).length > 0 && (
+        <p className="mt-3 text-sm text-muted-foreground"><b className="text-foreground">{unmarkedStudents(data.students, marks).length}</b> not scanned or marked yet — they will be saved as <b className="text-destructive">absent</b>.</p>
+      )}
       <div className="sticky bottom-4 mt-4 flex justify-end">
         <Button size="lg" onClick={save} disabled={saving || locked || !data?.students.length} className="shadow-card">
-          {saving ? "Saving…" : alreadySaved ? `Save ${period} corrections` : `Save ${period} attendance`}
+          {saving ? "Saving…" : alreadySaved ? `Save ${sessionName} corrections` : `Save ${sessionName} attendance`}
         </Button>
       </div>
     </div>

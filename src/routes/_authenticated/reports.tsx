@@ -3,7 +3,7 @@ import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { endOfMonth, endOfWeek, format, startOfMonth, startOfWeek } from "date-fns";
 import { FileSpreadsheet, FileText } from "lucide-react";
-import { attendanceRangeQuery, classesQuery, studentsQuery, summarize, today, type Status } from "@/lib/data";
+import { attendanceRangeQuery, classesQuery, departmentsQuery, sessionsQuery, studentsQuery, summarize, today, type Status } from "@/lib/data";
 import { exportExcel, exportPdf } from "@/lib/export";
 import { PageHeader, StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -12,11 +12,11 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AttendancePeriodSelect } from "@/components/AttendancePeriodSelect";
-import { periodLabel as sessionLabel, type AttendancePeriod } from "@/lib/attendance-period";
+import { periodLabel as sessionName, sessionOptions, type AttendancePeriod } from "@/lib/attendance-period";
 
 export const Route = createFileRoute("/_authenticated/reports")({
-  head: () => ({ meta: [{ title: "Reports – Attendly" }, { name: "description", content: "Morning and afternoon attendance reports and exports." }, { property: "og:title", content: "Reports – Attendly" }, { property: "og:description", content: "Morning and afternoon attendance reports and exports." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
-  loader: ({ context: { queryClient: q } }) => Promise.all([q.ensureQueryData(classesQuery), q.ensureQueryData(studentsQuery)]),
+  head: () => ({ meta: [{ title: "Reports – Attendly" }, { name: "description", content: "Department session attendance reports and exports." }, { property: "og:title", content: "Reports – Attendly" }, { property: "og:description", content: "Department session attendance reports and exports." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
+  loader: ({ context: { queryClient: q } }) => Promise.all([q.ensureQueryData(classesQuery), q.ensureQueryData(studentsQuery), q.ensureQueryData(sessionsQuery), q.ensureQueryData(departmentsQuery)]),
   component: Reports,
 });
 
@@ -38,7 +38,13 @@ function Reports() {
   const [ref, setRef] = useState(today());
   const [cls, setCls] = useState("all");
   const [studentId, setStudentId] = useState(students[0]?.id ?? "");
-  const [session, setSession] = useState<AttendancePeriod>("morning");
+  const { data: allSessions } = useSuspenseQuery(sessionsQuery);
+  const { data: departments } = useSuspenseQuery(departmentsQuery);
+  const options = sessionOptions(allSessions, departments);
+  const [chosen, setSession] = useState<AttendancePeriod>("");
+  const session = options.some((o) => o.value === chosen) ? chosen : options[0]?.value ?? "";
+  const classDept = Object.fromEntries(classes.map((c) => [c.id, c.department_id]));
+  const sessionLabel = (key: AttendancePeriod, classId?: string | null) => (classId ? sessionName(key, allSessions, classDept[classId]) : options.find((o) => o.value === key)?.label ?? sessionName(key, allSessions));
   const [from, to] = range(kind, ref);
   const { data: allRows = [], isLoading } = useQuery(attendanceRangeQuery(from, to));
   const rows = useMemo(() => allRows.filter((r) => r.period === session), [allRows, session]);
@@ -67,7 +73,7 @@ function Reports() {
     if (kind === "student" && student) {
       title = `${sessionLabel(session)} attendance history - ${student.full_name}`;
       head = ["Date", "Period", "Status", "Class"];
-      body = history.map((h) => [h.date, sessionLabel(h.period), h.status, h.class_id ? classMap[h.class_id] ?? "" : ""]);
+      body = history.map((h) => [h.date, sessionLabel(h.period, h.class_id), h.status, h.class_id ? classMap[h.class_id] ?? "" : ""]);
       body.push(["Total", sessionLabel(session), `${hs.rate}% attendance`, `${hs.present}P / ${hs.late}L / ${hs.absent}A`]);
     } else {
       title = `${sessionLabel(session)} ${kind} attendance report ${periodLabel}`;
@@ -90,7 +96,7 @@ function Reports() {
         <Button variant="outline" onClick={() => exportData("pdf")}><FileText /> PDF</Button>
         <Button variant="outline" onClick={() => exportData("xlsx")}><FileSpreadsheet /> Excel</Button>
       </PageHeader>
-      <div className="mb-4 max-w-sm"><AttendancePeriodSelect value={session} onChange={setSession} /></div>
+      <div className="mb-4 max-w-sm"><AttendancePeriodSelect value={session} onChange={setSession} options={options} /></div>
       <Tabs value={kind} onValueChange={(v) => setKind(v as Kind)} className="mb-4">
         <TabsList className="flex-wrap">
           <TabsTrigger value="daily">Daily</TabsTrigger>
@@ -138,7 +144,7 @@ function Reports() {
                 <TableRow key={`${h.date}:${h.period}`}>
                   <TableCell>{h.date}</TableCell>
                   <TableCell>{format(new Date(h.date + "T00:00"), "EEEE")}</TableCell>
-                  <TableCell>{sessionLabel(h.period)}</TableCell>
+                  <TableCell>{sessionLabel(h.period, h.class_id)}</TableCell>
                   <TableCell>{h.class_id ? classMap[h.class_id] : "—"}</TableCell>
                   <TableCell><StatusBadge status={h.status} /></TableCell>
                 </TableRow>

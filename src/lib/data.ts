@@ -41,6 +41,25 @@ export const departmentsQuery = queryOptions({
   },
 });
 
+export const sessionsQuery = queryOptions({
+  queryKey: ["attendance_sessions"],
+  queryFn: async () => {
+    const { data, error } = await supabase.from("attendance_sessions").select("id,key,name,start_time,department_id,active,sort_order").order("sort_order");
+    if (error) throw error;
+    return data ?? [];
+  },
+});
+
+/** Distinct days each visible student was present or late (any session), and days with any record. */
+export const attendanceDaysQuery = queryOptions({
+  queryKey: ["attendance", "days"],
+  queryFn: async () => {
+    const { data, error } = await supabase.rpc("student_attendance_days");
+    if (error) throw error;
+    return Object.fromEntries((data ?? []).map((r) => [r.student_id, { attended: Number(r.days_attended), recorded: Number(r.days_recorded) }])) as Record<string, { attended: number; recorded: number }>;
+  },
+});
+
 export const studentsQuery = queryOptions({
   queryKey: ["students"],
   queryFn: async () => {
