@@ -12,7 +12,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AttendancePeriodSelect } from "@/components/AttendancePeriodSelect";
-import { periodLabel as sessionName, sessionOptions, type AttendancePeriod } from "@/lib/attendance-period";
+import { dayCounts, daysTargetValue, matchesDaysFilter, periodLabel as sessionName, sessionOptions, type AttendancePeriod, type DaysComparator, type DaysMeasure } from "@/lib/attendance-period";
 
 export const Route = createFileRoute("/_authenticated/reports")({
   head: () => ({ meta: [{ title: "Reports – Attendly" }, { name: "description", content: "Department session attendance reports and exports." }, { property: "og:title", content: "Reports – Attendly" }, { property: "og:description", content: "Department session attendance reports and exports." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
@@ -22,6 +22,7 @@ export const Route = createFileRoute("/_authenticated/reports")({
 
 type Kind = "daily" | "weekly" | "monthly" | "student";
 const f = (d: Date) => format(d, "yyyy-MM-dd");
+const DAYS_CMP_LABEL: Record<DaysComparator, string> = { any: "", atLeast: "at least", exactly: "exactly", atMost: "at most" };
 
 function range(kind: Kind, ref: string): [string, string] {
   const d = new Date(ref + "T00:00");
@@ -38,6 +39,10 @@ function Reports() {
   const [ref, setRef] = useState(today());
   const [cls, setCls] = useState("all");
   const [studentId, setStudentId] = useState(students[0]?.id ?? "");
+  const [daysMeasure, setDaysMeasure] = useState<DaysMeasure>("attended");
+  const [daysCmp, setDaysCmp] = useState<DaysComparator>("any");
+  const [daysTarget, setDaysTarget] = useState("");
+  const daysActive = daysCmp !== "any";
   const { data: allSessions } = useSuspenseQuery(sessionsQuery);
   const { data: departments } = useSuspenseQuery(departmentsQuery);
   const options = sessionOptions(allSessions, departments);
@@ -50,20 +55,34 @@ function Reports() {
   const rows = useMemo(() => allRows.filter((r) => r.period === session), [allRows, session]);
   const classMap = Object.fromEntries(classes.map((c) => [c.id, c.label]));
 
+  const byStudent = useMemo(() => {
+    const g = new Map<string, typeof rows>();
+    rows.forEach((r) => { const list = g.get(r.student_id) ?? []; list.push(r); g.set(r.student_id, list); });
+    return g;
+  }, [rows]);
+  const dayCount = (id: string) => dayCounts(byStudent.get(id) ?? []);
+
   const perStudent = useMemo(() => {
     return students
       .filter((s) => cls === "all" || s.class_id === cls)
+      .filter((s) => matchesDaysFilter(dayCounts(byStudent.get(s.id) ?? []), daysMeasure, daysCmp, daysTargetValue(daysTarget)))
       .map((s) => {
-        const sr = rows.filter((r) => r.student_id === s.id);
-        const x = summarize(sr);
-        return { s, ...x, status: kind === "daily" ? (sr[0]?.status as Status | undefined) : undefined };
+        const sr = byStudent.get(s.id) ?? [];
+        return { s, ...summarize(sr), days: dayCounts(sr), status: kind === "daily" ? (sr[0]?.status as Status | undefined) : undefined };
       });
-  }, [students, rows, cls, kind]);
+  }, [students, byStudent, cls, kind, daysMeasure, daysCmp, daysTarget]);
 
-  const history = rows.filter((r) => r.student_id === studentId).sort((a, b) => b.date.localeCompare(a.date));
+  const studentChoices = useMemo(
+    () => students.filter((s) => matchesDaysFilter(dayCounts(byStudent.get(s.id) ?? []), daysMeasure, daysCmp, daysTargetValue(daysTarget))),
+    [students, byStudent, daysMeasure, daysCmp, daysTarget],
+  );
+  const activeStudent = studentChoices.some((s) => s.id === studentId) ? studentId : studentChoices[0]?.id ?? "";
+
+  const history = rows.filter((r) => r.student_id === activeStudent).sort((a, b) => b.date.localeCompare(a.date));
   const hs = summarize(history);
-  const student = students.find((s) => s.id === studentId);
-  const total = summarize(kind === "student" ? history : rows.filter((r) => cls === "all" || r.class_id === cls));
+  const student = students.find((s) => s.id === activeStudent);
+  const visibleIds = new Set(perStudent.map((p) => p.s.id));
+  const total = summarize(kind === "student" ? history : rows.filter((r) => (cls === "all" || r.class_id === cls) && visibleIds.has(r.student_id)));
 
   const periodLabel = kind === "daily" ? from : kind === "student" ? "All records" : `${from} to ${to}`;
   const scopeLabel = cls === "all" ? "All classes" : classMap[cls];
@@ -78,14 +97,15 @@ function Reports() {
     } else {
       title = `${sessionLabel(session)} ${kind} attendance report ${periodLabel}`;
       head = kind === "daily"
-        ? ["Student ID", "Name", "Class", "Period", "Status"]
-        : ["Student ID", "Name", "Class", "Period", "Present", "Late", "Absent", "Sessions", "Attendance %"];
+        ? ["Student ID", "Name", "Class", "Days attended", "Days recorded", "Period", "Status"]
+        : ["Student ID", "Name", "Class", "Days attended", "Days recorded", "Period", "Present", "Late", "Absent", "Sessions", "Attendance %"];
       body = perStudent.map((p) => {
-        const base = [p.s.student_code, p.s.full_name, p.s.class_id ? classMap[p.s.class_id] ?? "" : "", sessionLabel(session)];
+        const base = [p.s.student_code, p.s.full_name, p.s.class_id ? classMap[p.s.class_id] ?? "" : "", p.days.attended, p.days.recorded, sessionLabel(session)];
         return kind === "daily" ? [...base, p.status ?? "Not marked"] : [...base, p.present, p.late, p.absent, p.total, `${p.rate}%`];
       });
     }
-    const sub = `${scopeLabel} · ${periodLabel} · ${sessionLabel(session)} · Overall ${total.rate}% (present ${total.present}, late ${total.late}, absent ${total.absent})`;
+    const daysNote = daysActive ? ` · Days ${daysMeasure} ${DAYS_CMP_LABEL[daysCmp]} ${daysTarget}` : "";
+    const sub = `${scopeLabel} · ${periodLabel} · ${sessionLabel(session)}${daysNote} · Overall ${total.rate}% (present ${total.present}, late ${total.late}, absent ${total.absent})`;
     if (type === "pdf") exportPdf(title, sub, head, body);
     else exportExcel(title, head, body);
   }
@@ -109,7 +129,7 @@ function Reports() {
         {kind === "student" ? (
           <Select value={studentId} onValueChange={setStudentId}>
             <SelectTrigger className="sm:col-span-2"><SelectValue placeholder="Select student" /></SelectTrigger>
-            <SelectContent>{students.map((s) => <SelectItem key={s.id} value={s.id}>{s.full_name} ({s.student_code})</SelectItem>)}</SelectContent>
+            <SelectContent>{studentChoices.map((s) => <SelectItem key={s.id} value={s.id}>{s.full_name} ({s.student_code}) · {dayCount(s.id).attended} days attended</SelectItem>)}</SelectContent>
           </Select>
         ) : (
           <>
@@ -124,6 +144,44 @@ function Reports() {
           </>
         )}
         <div className="flex items-center rounded-md border bg-card px-3 text-sm text-muted-foreground">{periodLabel}</div>
+      </div>
+
+      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border bg-card px-3 py-2.5 shadow-card">
+        <span className="text-sm font-semibold text-muted-foreground">Days</span>
+        <Select value={daysMeasure} onValueChange={(v) => setDaysMeasure(v as DaysMeasure)}>
+          <SelectTrigger className="w-[168px]"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="attended">Days attended</SelectItem>
+            <SelectItem value="recorded">Days recorded</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={daysCmp} onValueChange={(v) => setDaysCmp(v as DaysComparator)}>
+          <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="any">Any number</SelectItem>
+            <SelectItem value="atLeast">At least</SelectItem>
+            <SelectItem value="exactly">Exactly</SelectItem>
+            <SelectItem value="atMost">At most</SelectItem>
+          </SelectContent>
+        </Select>
+        <Input
+          type="number"
+          min={0}
+          className="w-24"
+          placeholder="0"
+          aria-label="Number of days"
+          value={daysTarget}
+          onChange={(e) => setDaysTarget(e.target.value)}
+          disabled={!daysActive}
+        />
+        {daysActive && (
+          <Button size="sm" variant="ghost" onClick={() => { setDaysCmp("any"); setDaysTarget(""); }}>Clear</Button>
+        )}
+        <span className="ml-auto text-sm text-muted-foreground">
+          {kind === "student"
+            ? `${studentChoices.length} of ${students.length} students`
+            : `${perStudent.length} of ${students.filter((s) => cls === "all" || s.class_id === cls).length} students`}
+        </span>
       </div>
 
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -157,6 +215,7 @@ function Reports() {
             <TableHeader>
               <TableRow>
                 <TableHead>Student ID</TableHead><TableHead>Name</TableHead><TableHead>Class</TableHead>
+                <TableHead className="text-right">Days attended</TableHead><TableHead className="text-right">Days recorded</TableHead>
                 {kind === "daily" ? <TableHead>Status</TableHead> : (
                   <><TableHead>Present</TableHead><TableHead>Late</TableHead><TableHead>Absent</TableHead><TableHead>Attendance %</TableHead></>
                 )}
@@ -168,6 +227,8 @@ function Reports() {
                   <TableCell className="font-mono text-xs">{p.s.student_code}</TableCell>
                   <TableCell className="font-semibold">{p.s.full_name}</TableCell>
                   <TableCell>{p.s.class_id ? classMap[p.s.class_id] : "—"}</TableCell>
+                  <TableCell className="text-right tabular-nums">{p.days.attended}</TableCell>
+                  <TableCell className="text-right tabular-nums">{p.days.recorded}</TableCell>
                   {kind === "daily" ? (
                     <TableCell>{p.status ? <StatusBadge status={p.status} /> : <span className="text-xs text-muted-foreground">Not marked</span>}</TableCell>
                   ) : (

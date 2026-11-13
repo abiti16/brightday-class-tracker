@@ -73,6 +73,17 @@ export const NO_DAYS: DayCounts = { attended: 0, recorded: 0 };
 
 export const daysTargetValue = (raw: string) => (raw.trim() === "" ? null : Number(raw));
 
+/** Distinct dates attended (present or late) and dates with any record, from the rows in view. */
+export function dayCounts(rows: { date: string; status: "present" | "absent" | "late" }[]): DayCounts {
+  const attended = new Set<string>();
+  const recorded = new Set<string>();
+  for (const r of rows) {
+    recorded.add(r.date);
+    if (r.status !== "absent") attended.add(r.date);
+  }
+  return { attended: attended.size, recorded: recorded.size };
+}
+
 export function matchesDaysFilter(counts: DayCounts, measure: DaysMeasure, comparator: DaysComparator, target: number | null) {
   return matchesDays(counts[measure], comparator, target);
 }

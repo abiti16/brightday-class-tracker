@@ -1,5 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { ATTENDANCE_CONFLICT, DEFAULT_SESSIONS, NO_DAYS, attendanceRows, daysTargetValue, matchesDays, matchesDaysFilter, sessionsForDepartment } from "@/lib/attendance-period";
+import { ATTENDANCE_CONFLICT, DEFAULT_SESSIONS, NO_DAYS, attendanceRows, dayCounts, daysTargetValue, matchesDays, matchesDaysFilter, sessionsForDepartment } from "@/lib/attendance-period";
+
+describe("days in the report in view", () => {
+  it("counts each date once, attended only when present or late", () => {
+    const rows = [
+      { date: "2026-11-01", status: "present" as const },
+      { date: "2026-11-01", status: "late" as const },
+      { date: "2026-11-02", status: "absent" as const },
+      { date: "2026-11-03", status: "absent" as const },
+    ];
+    expect(dayCounts(rows)).toEqual({ attended: 1, recorded: 3 });
+    expect(dayCounts([])).toEqual(NO_DAYS);
+  });
+});
 
 describe("department attendance sessions", () => {
   it("unassigned classes keep morning and afternoon", () => {
