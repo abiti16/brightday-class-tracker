@@ -25,3 +25,8 @@
 - [ ] Department-named attendance sessions (name + time) managed by the super admin, used on attendance, dashboard and reports.
 - [x] Students page: filter by number of days attended.
 - [ ] Verify signed-in, run tests, commit.
+
+# Class schedule export
+- [x] Export all classes with their department sessions (name, start time, student count) to PDF and Excel.
+- [x] Embed an Ethiopic-capable font so Amharic class and session names print in PDFs.
+- [x] Verify downloads signed-in and commit.

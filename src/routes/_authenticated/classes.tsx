@@ -3,9 +3,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, UserPlus, Users } from "lucide-react";
+import { FileSpreadsheet, FileText, Plus, Trash2, UserPlus, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { classesQuery, departmentsQuery, gradesQuery, nameSchema, studentsQuery } from "@/lib/data";
+import { classesQuery, departmentsQuery, gradesQuery, nameSchema, sessionsQuery, studentsQuery } from "@/lib/data";
+import { SCHEDULE_HEAD, classScheduleRows, scheduleBody, scheduleSummary } from "@/lib/class-schedule";
+import { exportExcel, exportPdf } from "@/lib/export";
 import { useMe } from "@/lib/session";
 import { PageHeader } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -18,7 +20,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 export const Route = createFileRoute("/_authenticated/classes")({
   head: () => ({ meta: [{ title: "Classes – Attendly" }, { name: "description", content: "Manage grades and classes." }, { property: "og:title", content: "Classes – Attendly" }, { property: "og:description", content: "Manage grades and classes." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
   loader: ({ context: { queryClient: q } }) =>
-    Promise.all([q.ensureQueryData(classesQuery), q.ensureQueryData(gradesQuery), q.ensureQueryData(studentsQuery), q.ensureQueryData(departmentsQuery)]),
+    Promise.all([q.ensureQueryData(classesQuery), q.ensureQueryData(gradesQuery), q.ensureQueryData(studentsQuery), q.ensureQueryData(departmentsQuery), q.ensureQueryData(sessionsQuery)]),
   component: ClassesPage,
 });
 
@@ -28,6 +30,7 @@ function ClassesPage() {
   const { data: classes } = useSuspenseQuery(classesQuery);
   const { data: students } = useSuspenseQuery(studentsQuery);
   const { data: departments } = useSuspenseQuery(departmentsQuery);
+  const { data: sessions } = useSuspenseQuery(sessionsQuery);
   const qc = useQueryClient();
   const [gradeName, setGradeName] = useState("");
   const [className, setClassName] = useState("");
@@ -85,9 +88,20 @@ function ClassesPage() {
     await qc.invalidateQueries();
   }
 
+  function exportSchedule(type: "pdf" | "xlsx") {
+    const rows = classScheduleRows(classes, sessions, students);
+    if (!rows.length) { toast.error("No classes to export yet."); return; }
+    const [head, body] = [SCHEDULE_HEAD, scheduleBody(rows)];
+    if (type === "pdf") exportPdf("Class schedule", scheduleSummary(rows), head, body);
+    else exportExcel("Class schedule", head, body);
+  }
+
   return (
     <div className="mx-auto max-w-7xl">
-      <PageHeader title="Classes" description={`${grades.length} grades · ${classes.length} classes`} />
+      <PageHeader title="Classes" description={`${grades.length} grades · ${classes.length} classes`}>
+        <Button variant="outline" onClick={() => exportSchedule("pdf")}><FileText /> PDF</Button>
+        <Button variant="outline" onClick={() => exportSchedule("xlsx")}><FileSpreadsheet /> Excel</Button>
+      </PageHeader>
       {isAdmin && (
         <div className="mb-6 grid gap-4 md:grid-cols-2">
           <form onSubmit={addGrade} className="flex gap-2 rounded-xl border bg-card p-4 shadow-card">
