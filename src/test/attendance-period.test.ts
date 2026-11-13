@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ATTENDANCE_CONFLICT, DEFAULT_SESSIONS, attendanceRows, matchesDays, sessionsForDepartment } from "@/lib/attendance-period";
+import { ATTENDANCE_CONFLICT, DEFAULT_SESSIONS, NO_DAYS, attendanceRows, daysTargetValue, matchesDays, matchesDaysFilter, sessionsForDepartment } from "@/lib/attendance-period";
 
 describe("department attendance sessions", () => {
   it("unassigned classes keep morning and afternoon", () => {
@@ -31,5 +31,14 @@ describe("department attendance sessions", () => {
     expect(matchesDays(4, "atLeast", 5)).toBe(false);
     expect(matchesDays(5, "exactly", 5)).toBe(true);
     expect(matchesDays(6, "atMost", 5)).toBe(false);
+  });
+  it("filters the chosen day measure against the typed target", () => {
+    const counts = { attended: 5, recorded: 9 };
+    expect(matchesDaysFilter(counts, "attended", "atLeast", 6)).toBe(false);
+    expect(matchesDaysFilter(counts, "recorded", "atLeast", 6)).toBe(true);
+    expect(matchesDaysFilter(counts, "attended", "any", null)).toBe(true);
+    expect(matchesDaysFilter(NO_DAYS, "attended", "exactly", 0)).toBe(true);
+    expect(daysTargetValue("")).toBeNull();
+    expect(daysTargetValue("7")).toBe(7);
   });
 });

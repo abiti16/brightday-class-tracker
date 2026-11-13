@@ -23,5 +23,5 @@
 - [ ] Registration requests: super admin approves new accounts as student/teacher/admin or declines them.
 - [ ] Student role linked to a student record; students see only their own attendance; can be promoted to teacher.
 - [ ] Department-named attendance sessions (name + time) managed by the super admin, used on attendance, dashboard and reports.
-- [ ] Students page: filter by number of days attended.
+- [x] Students page: filter by number of days attended.
 - [ ] Verify signed-in, run tests, commit.

@@ -65,3 +65,14 @@ export function matchesDays(days: number, comparator: DaysComparator, target: nu
   if (comparator === "atMost") return days <= target;
   return days === target;
 }
+
+/** "attended" = days present or late; "recorded" = days with any attendance record. */
+export type DaysMeasure = "attended" | "recorded";
+export type DayCounts = { attended: number; recorded: number };
+export const NO_DAYS: DayCounts = { attended: 0, recorded: 0 };
+
+export const daysTargetValue = (raw: string) => (raw.trim() === "" ? null : Number(raw));
+
+export function matchesDaysFilter(counts: DayCounts, measure: DaysMeasure, comparator: DaysComparator, target: number | null) {
+  return matchesDays(counts[measure], comparator, target);
+}

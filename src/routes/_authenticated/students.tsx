@@ -4,7 +4,8 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { classesQuery, gradesQuery, studentSchema, studentsQuery, type StudentForm } from "@/lib/data";
+import { attendanceDaysQuery, classesQuery, gradesQuery, studentSchema, studentsQuery, type StudentForm } from "@/lib/data";
+import { daysTargetValue, matchesDaysFilter, NO_DAYS, type DaysComparator, type DaysMeasure } from "@/lib/attendance-period";
 import { useMe } from "@/lib/session";
 import { PageHeader } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -23,7 +24,7 @@ export const Route = createFileRoute("/_authenticated/students")({
   validateSearch: (s: Record<string, unknown>): Search => (typeof s["class"] === "string" ? { class: s["class"] } : {}),
   head: () => ({ meta: [{ title: "Students – Attendly" }, { name: "description", content: "Manage student records." }, { property: "og:title", content: "Students – Attendly" }, { property: "og:description", content: "Manage student records." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
   loader: ({ context: { queryClient: q } }) =>
-    Promise.all([q.ensureQueryData(studentsQuery), q.ensureQueryData(classesQuery), q.ensureQueryData(gradesQuery)]),
+    Promise.all([q.ensureQueryData(studentsQuery), q.ensureQueryData(classesQuery), q.ensureQueryData(gradesQuery), q.ensureQueryData(attendanceDaysQuery)]),
   component: StudentsPage,
 });
 
@@ -36,15 +37,22 @@ function StudentsPage() {
   const { data: students } = useSuspenseQuery(studentsQuery);
   const { data: classes } = useSuspenseQuery(classesQuery);
   const { data: grades } = useSuspenseQuery(gradesQuery);
+  const { data: days } = useSuspenseQuery(attendanceDaysQuery);
   const qc = useQueryClient();
   const [q, setQ] = useState("");
   const [grade, setGrade] = useState("all");
   const [cls, setCls] = useState(sp.class ?? "all");
   const [gender, setGender] = useState("all");
+  const [daysMeasure, setDaysMeasure] = useState<DaysMeasure>("attended");
+  const [daysCmp, setDaysCmp] = useState<DaysComparator>("any");
+  const [daysTarget, setDaysTarget] = useState("");
   const [editing, setEditing] = useState<{ id?: string; form: StudentForm } | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [deleting, setDeleting] = useState<{ id: string; name: string } | null>(null);
   const classMap = useMemo(() => Object.fromEntries(classes.map((c) => [c.id, c])), [classes]);
+
+  const dayCount = (id: string) => days[id] ?? NO_DAYS;
+  const daysActive = daysCmp !== "any";
 
   const filtered = students.filter((s) => {
     const c = s.class_id ? classMap[s.class_id] : undefined;
@@ -52,7 +60,8 @@ function StudentsPage() {
       (s.full_name + s.student_code + (s.phone ?? "")).toLowerCase().includes(q.toLowerCase()) &&
       (grade === "all" || c?.grade_id === grade) &&
       (cls === "all" || s.class_id === cls) &&
-      (gender === "all" || s.gender === gender)
+      (gender === "all" || s.gender === gender) &&
+      matchesDaysFilter(dayCount(s.id), daysMeasure, daysCmp, daysTargetValue(daysTarget))
     );
   });
 
@@ -129,6 +138,42 @@ function StudentsPage() {
         </Select>
       </div>
 
+      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border bg-card px-3 py-2.5 shadow-card">
+        <span className="text-sm font-semibold text-muted-foreground">Days</span>
+        <Select value={daysMeasure} onValueChange={(v) => setDaysMeasure(v as DaysMeasure)}>
+          <SelectTrigger className="w-[168px]"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="attended">Days attended</SelectItem>
+            <SelectItem value="recorded">Days recorded</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={daysCmp} onValueChange={(v) => setDaysCmp(v as DaysComparator)}>
+          <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="any">Any number</SelectItem>
+            <SelectItem value="atLeast">At least</SelectItem>
+            <SelectItem value="exactly">Exactly</SelectItem>
+            <SelectItem value="atMost">At most</SelectItem>
+          </SelectContent>
+        </Select>
+        <Input
+          type="number"
+          min={0}
+          className="w-24"
+          placeholder="0"
+          aria-label="Number of days"
+          value={daysTarget}
+          onChange={(e) => setDaysTarget(e.target.value)}
+          disabled={!daysActive}
+        />
+        {daysActive && (
+          <Button size="sm" variant="ghost" onClick={() => { setDaysCmp("any"); setDaysTarget(""); }}>Clear</Button>
+        )}
+        <span className="ml-auto text-sm text-muted-foreground">
+          {filtered.length} of {students.length} students
+        </span>
+      </div>
+
       <div className="overflow-x-auto rounded-xl border bg-card shadow-card">
         <Table>
           <TableHeader>
@@ -139,6 +184,8 @@ function StudentsPage() {
               <TableHead>Grade</TableHead>
               <TableHead>Class</TableHead>
               <TableHead>Phone</TableHead>
+              <TableHead className="text-right">Days attended</TableHead>
+              <TableHead className="text-right">Days recorded</TableHead>
               {isAdmin && <TableHead className="text-right">Actions</TableHead>}
             </TableRow>
           </TableHeader>
@@ -153,6 +200,8 @@ function StudentsPage() {
                   <TableCell>{c?.grade ?? "—"}</TableCell>
                   <TableCell>{c?.name ?? "Unassigned"}</TableCell>
                   <TableCell>{s.phone ?? "—"}</TableCell>
+                  <TableCell className="text-right tabular-nums">{dayCount(s.id).attended}</TableCell>
+                  <TableCell className="text-right tabular-nums">{dayCount(s.id).recorded}</TableCell>
                   {isAdmin && (
                     <TableCell className="whitespace-nowrap text-right">
                       <Button size="icon" variant="ghost" aria-label="Edit" onClick={() => {
@@ -168,7 +217,7 @@ function StudentsPage() {
               );
             })}
             {filtered.length === 0 && (
-              <TableRow><TableCell colSpan={7} className="py-10 text-center text-muted-foreground">No students match your filters.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={isAdmin ? 9 : 8} className="py-10 text-center text-muted-foreground">No students match your filters.</TableCell></TableRow>
             )}
           </TableBody>
         </Table>
