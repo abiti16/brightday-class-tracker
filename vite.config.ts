@@ -7,9 +7,17 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
+  // Bolt hosting publishes static files, so build as an SPA instead of an SSR
+  // server bundle. The client still talks to Supabase directly.
+  nitro: false,
   tanstackStart: {
-    // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
-    // nitro/vite builds from this
-    server: { entry: "server" },
+    spa: { enabled: true, maskPath: "/", prerender: { enabled: true, outputPath: "/index.html" } },
+  },
+  vite: {
+    environments: {
+      client: {
+        build: { outDir: "dist" },
+      },
+    },
   },
 });
